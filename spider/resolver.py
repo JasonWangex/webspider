@@ -1,12 +1,14 @@
 # coding=utf8
 from bs4 import BeautifulSoup
+import User
+import json
 
 
 def get_or_null(f, *args):
     try:
-        return f(args) or u"未知"
+        return f(args) or u""
     except AttributeError:
-        return u"未知"
+        return u""
 
 
 def get_all_text(collections):
@@ -17,7 +19,7 @@ def get_all_text(collections):
     return rtn[:len(rtn) - 2]
 
 
-def resolve_for_information(response):
+def resolve_for_user(response):
     soup = BeautifulSoup(response, "html.parser")
     head_body = soup.find("div", class_="body clearfix")
 
@@ -40,26 +42,51 @@ def resolve_for_information(response):
     hash_id = soup.find("button", "zg-btn zg-btn-follow zm-rich-follow-btn")("data-id")
 
     try:
-        gender = u"男" if u"icon-profile-male" in head_body.find("span", class_="item gender").find("i").get(
-            'class') else u"女"
+        gender = 1 if u"icon-profile-male" in head_body.find("span", class_="item gender").find("i").get(
+            'class') else 2
     except AttributeError:
-        gender = u"未知"
+        gender = 0
 
-    dic = {
-        "name": name,
-        "avatar": avatar,
-        "gender": gender,
-        "introduction": introduction,
-        "description": description,
-        "location": location,
-        "education": education,
-        "approval": approval,
-        "thanks": thanks,
-        "collected": collected,
-        "share": share,
-        "career": career,
-        "hashId": hash_id
-    }
-    return dic
+    user = User()
+    # dic = {
+    #     "name": name,
+    #     "avatar": avatar,
+    #     "gender": gender,
+    #     "introduction": introduction,
+    #     "description": description,
+    #     "location": location,
+    #     "education": education,
+    #     "approval": approval,
+    #     "thanks": thanks,
+    #     "collected": collected,
+    #     "share": share,
+    #     "career": career,
+    #     "hashId": hash_id
+    # }
+    user.name = name
+    user.avatar = avatar
+    user.gender = gender
+    user.introduction = introduction
+    user.description = description
+    user.location = location
+    user.education = education
+    user.approval = approval
+    user.thanks = thanks
+    user.collected = collected
+    user.share = share
+    user.career = career
+    user.hashId = hash_id
 
-# def resolve_for_url(response):
+    return user
+
+
+def resolve_for_users(response):
+    response = json.JSONDecoder().decode(response)
+    list = response['msg']
+    # for item in list:
+
+
+
+def resolve_for_url(html):
+    soup = BeautifulSoup(html, "html.parser")
+
