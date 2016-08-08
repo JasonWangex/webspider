@@ -86,7 +86,5 @@ def resolve_for_users(response):
     # for item in list:
 
 
-
 def resolve_for_url(html):
     soup = BeautifulSoup(html, "html.parser")
-

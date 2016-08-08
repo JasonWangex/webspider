@@ -54,8 +54,7 @@ def get_content(url):
 
 
 def get_followers(hash_id, page):
-    r = open('temp', 'r')
-    li = json.JSONDecoder().decode(r.read())
+    pass
 
 start = time.time()
 print get_followers("3484f433b6b2ab66ad012910ae6ae48a", 1)

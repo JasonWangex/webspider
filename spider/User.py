@@ -1,22 +1,26 @@
-class User(object):
-    id = None
-    name = None
-    uid = None
-    hashId = None
-    gender = None
-    avatar = None
-    introduction = None
-    description = None
-    career = None
-    location = None
-    education = None
-    approval = None
-    thanks = None
-    collected = None
-    share = None
+from sqlalchemy import Column, String, Integer, create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.ext.declarative import declarative_base
 
-    def __init__(self):
-        pass
+Base = declarative_base()
 
-    def equal(self, other):
-        return self.hashId == other.hashId
+
+class User(Base):
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String, default="")
+    uid = Column(String, default="")
+    hashId = Column(String, default="")
+    gender = Column(Integer, default=0)
+    avatar = Column(String, default="")
+    introduction = Column(String, default="")
+    description = Column(String, default="")
+    career = Column(String, default="")
+    location = Column(String, default="")
+    education = Column(String, default="")
+    approval = Column(Integer, default=0)
+    thanks = Column(Integer, default=0)
+    collected = Column(Integer, default=0)
+    share = Column(Integer, default=0)
+
+
