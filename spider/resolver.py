@@ -22,16 +22,33 @@ def get_all_text(collections):
 def resolve_for_user(response):
     soup = BeautifulSoup(response, "html.parser")
     soup.prettify("utf-8")
-    follow = soup.find("div", class_='zm-profile-side-following zg-clear').find_all('strong')
-    followees = follow[0].get_text()
-    followers = follow[1].get_text()
+    try:
+        follow = soup.find("div", class_='zm-profile-side-following zg-clear').find_all('strong')
+        followees = follow[0].get_text()
+        followers = follow[1].get_text()
+    except AttributeError:
+        followees = 0
+        followers = 0
+        print 'error : soup'
+        f = open('temp', "w+r+")
+        f.write(response)
+        f.close()
 
     head_body = soup.find("div", class_="body clearfix")
 
     name = head_body.find("a", class_="name").get_text()
+    uid = head_body.find("a", class_="name").get('href').replace('/people/', '')
     avatar = get_or_null(head_body.find("img", class_="Avatar--l").get, 'src')
-    introduction = get_or_null(head_body.find("div", "bio ellipsis").get, 'title')
-    description = get_or_null(head_body.find("span", "fold-item").get_text)
+
+    try:
+        introduction = head_body.find("div", "bio ellipsis").get('title')
+    except AttributeError:
+        introduction = u""
+
+    try:
+        description = head_body.find("span", "fold-item").get_text()
+    except AttributeError:
+        description = u""
 
     details = soup.find("div", class_="zm-profile-section-list zm-profile-details").find_all("div",
                                                                                              class_="zm-profile-module")
@@ -69,6 +86,7 @@ def resolve_for_user(response):
     #     "hashId": hash_id
     # }
     user.name = name
+    user.uid = uid
     user.avatar = avatar
     user.gender = int(gender)
     user.introduction = introduction
@@ -86,7 +104,7 @@ def resolve_for_user(response):
     return user
 
 
-def resolve_for_urls(response):
+def resolve_for_uids(response):
     response = json.JSONDecoder().decode(response)
     msg = response['msg']
     urls = []

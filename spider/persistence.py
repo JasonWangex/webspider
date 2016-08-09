@@ -1,8 +1,8 @@
-from _locale import Error
-
 from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.exc import NoResultFound
+import spider
 
 from User import User
 
@@ -31,8 +31,6 @@ class user_dao(object):
             else:
                 session.add(user)
             session.commit()
-        except Error:
-            pass
         finally:
             session.close()
 
@@ -50,7 +48,7 @@ class user_dao(object):
                 users
             )
             session.commit()
-        except Error:
+        except IntegrityError:
             for user in user_list:
                 user_dao.save_or_update(user)
         finally:
@@ -61,7 +59,7 @@ class user_dao(object):
         global DBSession
         session = DBSession()
         try:
-            user = session.query(User).filter(User.needGetFollowers is True).one()
+            user = session.query(User).filter(User.needGetFollowers == True).first()
             return user
         except NoResultFound:
             pass
@@ -73,7 +71,7 @@ class user_dao(object):
         global DBSession
         session = DBSession()
         try:
-            user = session.query(User).filter(User.needGetFollowees is True).one()
+            user = session.query(User).filter(User.needGetFollowees == True).first()
             return user
         except NoResultFound:
             pass
