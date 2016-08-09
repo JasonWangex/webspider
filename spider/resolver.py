@@ -80,11 +80,20 @@ def resolve_for_user(response):
     return user
 
 
-def resolve_for_users(response):
+def resolve_for_urls(response):
     response = json.JSONDecoder().decode(response)
-    list = response['msg']
-    # for item in list:
+    msg = response['msg']
+    urls = []
+    for item in msg:
+        urls.append(resolve_for_uid(item))
+    return urls
 
 
-def resolve_for_url(html):
+def resolve_for_uid(html):
     soup = BeautifulSoup(html, "html.parser")
+    uid = soup.find('a', class_='zm-item-link-avatar').get('href').replace('/people/', '')
+    return uid
+
+
+def get_url_by_uid(uid):
+    return "https://www.zhihu.com/people/" + uid

@@ -1,11 +1,11 @@
+from _locale import Error
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from User import User
-import json
 
 engine = None
 DBSession = None
-
 
 
 class user_dao(object):
@@ -23,25 +23,36 @@ class user_dao(object):
     def save_or_update(user):
         global DBSession
         session = DBSession()
-        if user.id is not None:
-            session.merge(user)
-        else:
-            session.add(user)
-        session.flush()
-        session.commit()
+        try:
+            if user.id is not None:
+                session.merge(user)
+            else:
+                session.add(user)
+            session.commit()
+        except Error:
+            pass
+        finally:
+            session.close()
 
     @staticmethod
-    def save_or_update_all(userlist):
+    def save_or_update_all(user_list):
         global DBSession
         session = DBSession()
         users = list()
-        for user in userlist:
+        for user in user_list:
             users.append(user.__dict__)
 
-        session.execute(
-            User.__table__.insert(),
-            users
-        )
-        session.commit()
+        try:
+            session.execute(
+                User.__table__.insert(),
+                users
+            )
+            session.commit()
+        except Error:
+            for user in user_list:
+                user_dao.save_or_update(user)
+        finally:
+            session.close()
 
-new_user = User(name="dddd", uid="123")
+
+
