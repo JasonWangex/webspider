@@ -36,7 +36,7 @@ cookies = dict(
    cookie
 )
 
-first_url = "https://www.zhihu.com/people/boxun/about"
+first_uid = "boxun"
 
 
 

@@ -24,9 +24,9 @@ class User(Base):
     followers = Column(Integer, default=0)
     followees = Column(Integer, default=0)
     getFollowers = Column(Integer, default=0)
-    needGetFollowers = Column(Boolean, default=0)
+    needGetFollowers = Column(Boolean, default=True)
     getFollowees = Column(Integer, default=0)
-    needGetFollowees = Column(Boolean, default=0)
+    needGetFollowees = Column(Boolean, default=True)
 
 
 
