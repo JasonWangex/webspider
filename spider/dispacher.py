@@ -1,5 +1,4 @@
 # coding=utf-8
-import User
 import config
 import download
 import resolver
@@ -88,7 +87,6 @@ def resolve_thread():
 def followee_url_thread():
     global all_uid_list
     global uid_set
-    current_user = None
     while not shut_down:
         time.sleep(0.5)
         current_user = user_dao.get_user_for_followees()
@@ -110,7 +108,6 @@ def followee_url_thread():
         current_user.needGetFollowees = False
         current_user.getFollowees = max_followee_page
         user_dao.save_or_update(current_user)
-    user_dao.save_or_update(current_user)
 
 
 def follower_url_thread():
