@@ -20,7 +20,7 @@ def get_content(url):
     return resp.content
 
 
-def get_followers(hash_id, page):
+def get_followers(hash_id, page, url='ProfileFollowersListV2'):
     params = {
         'offset': page * 20,
         'hash_id': hash_id,
@@ -31,9 +31,13 @@ def get_followers(hash_id, page):
         "method": "next",
         "params": json.loads(params)
     }
-    resp = requests.post("https://www.zhihu.com/node/ProfileFollowersListV2", data=data, headers=config.header,
+    resp = requests.post("https://www.zhihu.com/node/" + url, data=data, headers=config.header,
                          cookies=config.cookies)
     return resp
+
+
+def get_followees(hash_id, page):
+    return get_followers(hash_id=hash_id, page=page, url='ProfileFolloweesListV2')
 
 
 start = time.time()

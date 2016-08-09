@@ -1,5 +1,4 @@
-from sqlalchemy import Column, String, Integer, create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import Column, String, Integer, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 
 Base = declarative_base()
@@ -22,5 +21,12 @@ class User(Base):
     thanks = Column(Integer, default=0)
     collected = Column(Integer, default=0)
     share = Column(Integer, default=0)
+    followers = Column(Integer, default=0)
+    followees = Column(Integer, default=0)
+    getFollowers = Column(Integer, default=0)
+    needGetFollowers = Column(Boolean, default=0)
+    getFollowees = Column(Integer, default=0)
+    needGetFollowees = Column(Boolean, default=0)
+
 
 

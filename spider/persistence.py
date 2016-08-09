@@ -54,5 +54,16 @@ class user_dao(object):
         finally:
             session.close()
 
+    @staticmethod
+    def get_user_for_followers():
+        global DBSession
+        session = DBSession()
+        user = session.query(User).filter(User.needGetFollowers is True).one()
+        return user
 
-
+    @staticmethod
+    def get_user_for_followees():
+        global DBSession
+        session = DBSession()
+        user = session.query(User).filter(User.needGetFollowees is True).one()
+        return user

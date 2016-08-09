@@ -1,6 +1,6 @@
 # coding=utf8
 from bs4 import BeautifulSoup
-import User
+from User import User
 import json
 
 
@@ -21,6 +21,10 @@ def get_all_text(collections):
 
 def resolve_for_user(response):
     soup = BeautifulSoup(response, "html.parser")
+    follow = soup.find("div", class_='zm-profile-side-following zg-clear').find_all('strong')
+    followees = follow[0].get_text()
+    followers = follow[1].get_text()
+
     head_body = soup.find("div", class_="body clearfix")
 
     name = head_body.find("a", class_="name").get_text()
@@ -76,7 +80,8 @@ def resolve_for_user(response):
     user.share = share
     user.career = career
     user.hashId = hash_id
-
+    user.followees = followees
+    user.followers = followers
     return user
 
 
