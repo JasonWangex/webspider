@@ -37,15 +37,21 @@ def init_spider():
     global all_uid_list
 
     with open('all_uid_list', 'rb') as f_all_uid:
-        all_uid_list = pickle.load(f_all_uid)
+        if f_all_uid.readline() != "":
+            f_all_uid.seek(0)
+            all_uid_list = pickle.load(f_all_uid)
 
     with open('content_queue', 'rb') as f_content_queue:
-        content_list = pickle.load(f_content_queue)
-        for content in content_list:
-            content_queue.put(content, block=True)
+        if f_content_queue.readline() != "":
+            f_content_queue.seek(0)
+            content_list = pickle.load(f_content_queue)
+            for content in content_list:
+                content_queue.put(content, block=True)
 
     with open('uid_set', 'rb') as f_uid_set:
-        uid_set = pickle.load(f_uid_set)
+        if f_uid_set.readline() != "":
+            f_uid_set.seek(0)
+            uid_set = pickle.load(f_uid_set)
 
 
 def download_thread():
