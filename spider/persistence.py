@@ -2,6 +2,8 @@ from _locale import Error
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm.exc import NoResultFound
+
 from User import User
 
 engine = None
@@ -58,12 +60,22 @@ class user_dao(object):
     def get_user_for_followers():
         global DBSession
         session = DBSession()
-        user = session.query(User).filter(User.needGetFollowers is True).one()
-        return user
+        try:
+            user = session.query(User).filter(User.needGetFollowers is True).one()
+            return user
+        except NoResultFound:
+            pass
+        finally:
+            session.close()
 
     @staticmethod
     def get_user_for_followees():
         global DBSession
         session = DBSession()
-        user = session.query(User).filter(User.needGetFollowees is True).one()
-        return user
+        try:
+            user = session.query(User).filter(User.needGetFollowees is True).one()
+            return user
+        except NoResultFound:
+            pass
+        finally:
+            session.close()

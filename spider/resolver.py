@@ -21,6 +21,7 @@ def get_all_text(collections):
 
 def resolve_for_user(response):
     soup = BeautifulSoup(response, "html.parser")
+    soup.prettify("utf-8")
     follow = soup.find("div", class_='zm-profile-side-following zg-clear').find_all('strong')
     followees = follow[0].get_text()
     followers = follow[1].get_text()
@@ -43,7 +44,7 @@ def resolve_for_user(response):
     career = get_all_text(details[1](["span", "a"]))
     location = get_all_text(details[2](["span", "a"]))
     education = get_all_text(details[3](["span", "a"]))
-    hash_id = soup.find("button", "zg-btn zg-btn-follow zm-rich-follow-btn")("data-id")
+    hash_id = soup.find("button", "zg-btn zg-btn-follow zm-rich-follow-btn").get("data-id")
 
     try:
         gender = 1 if u"icon-profile-male" in head_body.find("span", class_="item gender").find("i").get(
@@ -69,19 +70,19 @@ def resolve_for_user(response):
     # }
     user.name = name
     user.avatar = avatar
-    user.gender = gender
+    user.gender = int(gender)
     user.introduction = introduction
     user.description = description
     user.location = location
     user.education = education
-    user.approval = approval
-    user.thanks = thanks
-    user.collected = collected
-    user.share = share
+    user.approval = int(approval)
+    user.thanks = int(thanks)
+    user.collected = int(collected)
+    user.share = int(share)
     user.career = career
     user.hashId = hash_id
-    user.followees = followees
-    user.followers = followers
+    user.followees = int(followees)
+    user.followers = int(followers)
     return user
 
 
@@ -101,4 +102,4 @@ def resolve_for_uid(html):
 
 
 def get_url_by_uid(uid):
-    return "https://www.zhihu.com/people/" + uid
+    return "https://www.zhihu.com/people/" + uid + "/about"

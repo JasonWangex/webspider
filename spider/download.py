@@ -16,7 +16,7 @@ def get_content2(url):
 
 
 def get_content(url):
-    resp = requests.get(url, headers=config.header, cookies=config.cookie)
+    resp = requests.get(url, headers=config.header)
     return resp.content
 
 
@@ -29,17 +29,12 @@ def get_followers(hash_id, page, url='ProfileFollowersListV2'):
 
     data = {
         "method": "next",
-        "params": json.loads(params)
+        "params": json.dumps(params)
     }
-    resp = requests.post("https://www.zhihu.com/node/" + url, data=data, headers=config.header,
-                         cookies=config.cookies)
-    return resp
+    resp = requests.post("https://www.zhihu.com/node/" + url, data=data, headers=config.header)
+    return resp.content
 
 
 def get_followees(hash_id, page):
     return get_followers(hash_id=hash_id, page=page, url='ProfileFolloweesListV2')
 
-
-start = time.time()
-print get_followers("3484f433b6b2ab66ad012910ae6ae48a", 1)
-mid = time.time()

@@ -34,7 +34,7 @@ def download_thread():
             url = resolver.get_url_by_uid(uid)
             all_uid_list.append(uid)
             content = download.get_content(url)
-            while user_queue.full():
+            while not content_queue.full():
                 content_queue.put(content)
                 time.sleep(0.5)
         else:
@@ -59,6 +59,10 @@ def followee_url_thread():
     current_user = None
     while not shut_down:
         current_user = user_dao.get_user_for_followees()
+        if current_user is None:
+            time.sleep(0.5)
+            continue
+
         max_followee_page = 0 if current_user.followees == 0 else current_user.followees % 20 + 1
         while current_user.getFollowees < max_followee_page:
             msg = download.get_followers(hash_id=current_user.hashId, page=current_user.getFollowees)
@@ -80,6 +84,9 @@ def follower_url_thread():
     current_user = None
     while not shut_down:
         current_user = user_dao.get_user_for_followees()
+        if current_user is None:
+            time.sleep(0.5)
+            continue
         max_follower_page = 0 if current_user.followers == 0 else current_user.followers % 20 + 1
         while current_user.getFollowers < max_follower_page:
             msg = download.get_followers(hash_id=current_user.hashId, page=current_user.getFollowers)
@@ -95,11 +102,11 @@ def follower_url_thread():
     user_dao.save_or_update(current_user)
 
 
-t1 = threading.Thread(download_thread)
-t5 = threading.Thread(download_thread)
-t2 = threading.Thread(resolve_thread)
-t3 = threading.Thread(followee_url_thread)
-t4 = threading.Thread(follower_url_thread)
+t1 = threading.Thread(target=download_thread)
+t5 = threading.Thread(target=download_thread)
+t2 = threading.Thread(target=resolve_thread)
+t3 = threading.Thread(target=followee_url_thread)
+t4 = threading.Thread(target=follower_url_thread)
 
 t1.start()
 t2.start()
