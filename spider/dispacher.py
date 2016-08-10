@@ -104,7 +104,7 @@ def followee_url_thread():
 
         max_followee_page = 0 if current_user.followees == 0 else current_user.followees % 20 + 1
         while current_user.getFollowees < max_followee_page:
-            msg = download.get_followers(hash_id=current_user.hashId, page=current_user.getFollowees)
+            msg = download.get_followees(hash_id=current_user.hashId, page=current_user.getFollowees)
             current_user.getFollowees += 1
             uids = resolver.resolve_for_uids(msg)
             for uid in filter(lambda x: x is not None and x not in all_uid_list, uids):
@@ -131,7 +131,7 @@ def follower_url_thread():
         max_follower_page = 0 if current_user.followers == 0 else current_user.followers % 20 + 1
         while current_user.getFollowers < max_follower_page:
             msg = download.get_followers(hash_id=current_user.hashId, page=current_user.getFollowers)
-            current_user.getFollowees += 1
+            current_user.getFollowers += 1
             uids = resolver.resolve_for_uids(msg)
             for uid in filter(lambda x: x is not None and x not in all_uid_list, uids):
                 while is_uid_set_full() and not shut_down:
