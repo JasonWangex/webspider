@@ -30,7 +30,10 @@ def resolve_for_user(response):
 
     name = head_body.find("a", class_="name").get_text()
     uid = head_body.find("a", class_="name").get('href').replace('/people/', '')
-    avatar = get_or_null(head_body.find("img", class_="Avatar--l").get, 'src')
+    try:
+        avatar = head_body.find("img", class_="Avatar--l").get('src')
+    except AttributeError:
+        avatar = u""
 
     try:
         introduction = head_body.find("div", "bio ellipsis").get('title')
@@ -38,7 +41,7 @@ def resolve_for_user(response):
         introduction = u""
 
     try:
-        description = head_body.find("span", "fold-item").get_text()
+        description = head_body.find("span", "unfold-item").find('span', class_='content').get_text()
     except AttributeError:
         description = u""
 

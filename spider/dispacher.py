@@ -39,11 +39,12 @@ def init_spider():
     global content_queue
     global all_uid_list
 
-    print '=======================正在初始化========================='
+    print '///////////系统初始化///////////'
     with open('all_uid_list', 'rb') as f_all_uid:
         if f_all_uid.readline() != "":
             f_all_uid.seek(0)
             all_uid_list = pickle.load(f_all_uid)
+    print '>>>>>>> 初始化 all_uid_list 完毕'
 
     with open('content_queue', 'rb') as f_content_queue:
         if f_content_queue.readline() != "":
@@ -51,12 +52,14 @@ def init_spider():
             content_list = pickle.load(f_content_queue)
             for content in content_list:
                 content_queue.put(content, block=True)
+    print '>>>>>>> 初始化 content_queue 完毕'
 
     with open('uid_set', 'rb') as f_uid_set:
         if f_uid_set.readline() != "":
             f_uid_set.seek(0)
             uid_set = pickle.load(f_uid_set)
-    print '=======================初始化完毕========================='
+    print '>>>>>>> 初始化 uid_set 完毕'
+    print '///////////初始化完毕///////////\n'
 
 
 def download_thread():
@@ -136,7 +139,7 @@ def follower_url_thread():
             current_user.getFollowers += 1
             uids = resolver.resolve_for_uids(msg)
             for uid in filter(lambda x: x is not None, uids):
-                while is_uid_set_full() and not shut_down and uid in all_uid_list:
+                while is_uid_set_full() and not shut_down:
                     time.sleep(0.5)
                 if uid in all_uid_list:
                     continue
@@ -156,11 +159,13 @@ def report():
     global all_uid_list
     while not shut_down:
         time.sleep(10)
-        print "=========================监====控============================"
-        print "uid_queue: ", len(uid_set)
-        print "content_queue: ", content_queue.qsize()
-        print "all_uid_list: ", len(all_uid_list)
-        print "============================================================"
+        if shut_down:
+            return
+        print "\n////////////数据报告////////////"
+        print ">>>> uid_queue: ", len(uid_set)
+        print ">>>> content_queue: ", content_queue.qsize()
+        print ">>>> all_uid_list: ", len(all_uid_list)
+        print "////////////数据报告////////////\n"
 
 
 def listener(thrs):
@@ -170,11 +175,17 @@ def listener(thrs):
     while raw_input() != 'exit':
         continue
     shut_down = True
-    time.sleep(10)
+    time.sleep(1)
+    print '系统将在 10 秒之后进入关闭流程！'
+    for i in range(9, 0, -1):
+        time.sleep(1)
+        print i
+
     for thr in thrs:
         if thr.isAlive():
             print thr.name, 'is not shutdown'
     after_shut_down()
+    print '\n/////////系统关闭！/////////'
 
 
 def start_thread():
@@ -194,8 +205,10 @@ def start_thread():
 
 
 def after_shut_down():
+    print '>>>>>> 信息存储中'
     with open('all_uid_list', 'wb') as f_all_uid:
         pickle.dump(all_uid_list, file=f_all_uid)
+    print '>>>>>> all_uid_list 存储完毕'
 
     with open('content_queue', 'wb') as f_content_queue:
         # queue 无法序列化, 只能转成list
@@ -204,9 +217,11 @@ def after_shut_down():
             content = content_queue.get(block=True)
             content_list.append(content)
         pickle.dump(content_list, file=f_content_queue)
+    print '>>>>>> content_queue 存储完毕'
 
     with open('uid_set', 'wb') as f_uid_set:
         pickle.dump(uid_set, file=f_uid_set)
+    print '>>>>>> uid_set 存储完毕'
 
 
 # spider begin
