@@ -12,7 +12,7 @@ DBSession = None
 def start_session():
     global engine
     global DBSession
-    engine = create_engine('mysql+mysqlconnector://root:wjz@17948@localhost:3306/zhihu_users')
+    engine = create_engine('mysql+mysqlconnector://root:wjz@17948@localhost:3306/zhihu_users?charset=utf8mb4')
     DBSession = sessionmaker(bind=engine)
 
 
