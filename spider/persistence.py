@@ -2,24 +2,23 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.exc import NoResultFound
-import spider
 
-from User import User
+from Domain import User
 
 engine = None
 DBSession = None
 
 
+def start_session():
+    global engine
+    global DBSession
+    engine = create_engine('mysql+mysqlconnector://root:wjz@17948@localhost:3306/zhihu_users')
+    DBSession = sessionmaker(bind=engine)
+
+
 class user_dao(object):
     def __init__(self):
         pass
-
-    @staticmethod
-    def start_session():
-        global engine
-        global DBSession
-        engine = create_engine('mysql+mysqlconnector://root:wjz@17948@localhost:3306/zhihu_users')
-        DBSession = sessionmaker(bind=engine)
 
     @staticmethod
     def save_or_update(user):
@@ -75,5 +74,21 @@ class user_dao(object):
             return user
         except NoResultFound:
             pass
+        finally:
+            session.close()
+
+
+class failed_dao(object):
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def save(failed):
+        global DBSession
+        session = DBSession()
+        try:
+            failed.id = None
+            session.add(failed)
+            session.commit()
         finally:
             session.close()

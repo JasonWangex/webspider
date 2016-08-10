@@ -29,4 +29,7 @@ class User(Base):
     needGetFollowees = Column(Boolean, default=True)
 
 
-
+class Failed(Base):
+    __tablename__ = 'failed'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    content = Column(String)
