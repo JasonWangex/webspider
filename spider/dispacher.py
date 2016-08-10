@@ -107,9 +107,11 @@ def followee_url_thread():
             msg = download.get_followees(hash_id=current_user.hashId, page=current_user.getFollowees)
             current_user.getFollowees += 1
             uids = resolver.resolve_for_uids(msg)
-            for uid in filter(lambda x: x is not None and x not in all_uid_list, uids):
+            for uid in filter(lambda x: x is not None, uids):
                 while is_uid_set_full() and not shut_down:
                     time.sleep(0.5)
+                if uid in all_uid_list:
+                    continue
                 with uid_in_lock:
                     uid_set.add(uid)
             if shut_down:
@@ -133,11 +135,13 @@ def follower_url_thread():
             msg = download.get_followers(hash_id=current_user.hashId, page=current_user.getFollowers)
             current_user.getFollowers += 1
             uids = resolver.resolve_for_uids(msg)
-            for uid in filter(lambda x: x is not None and x not in all_uid_list, uids):
-                while is_uid_set_full() and not shut_down:
+            for uid in filter(lambda x: x is not None, uids):
+                while is_uid_set_full() and not shut_down and uid in all_uid_list:
                     time.sleep(0.5)
-                    with uid_in_lock:
-                        uid_set.add(uid)
+                if uid in all_uid_list:
+                    continue
+                with uid_in_lock:
+                    uid_set.add(uid)
             if shut_down:
                 user_dao.save_or_update(current_user)
                 return
