@@ -1,18 +1,19 @@
 # coding=utf-8
 import time
 from Queue import Full
+
+from multiprocessing.managers import BaseManager
+
 import config
 import download
 import resolver
 import threading
-import persistence
 from Domain import Failed
 from persistence import user_dao
 from persistence import failed_dao
 from multiprocessing import Process
 from multiprocessing import Queue
 from multiprocessing import Value
-from multiprocessing import Pool
 
 try:
     import cPickle as pickle
@@ -178,23 +179,6 @@ def clean_uid(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
             all_uid_list.append(waiting_clean_uid)
 
 
-def start_process(all_uid_list, uid_queue, uid_with_trash_queue, shutdown):
-    process = []
-    for i in range(1, 3):
-        process.append(Process(target=download_process, args=(uid_queue, shutdown,)))
-
-    process.append(Process(target=followee_url_process, args=(uid_with_trash_queue, shutdown,)))
-    process.append(Process(target=follower_url_process, args=(uid_with_trash_queue, shutdown,)))
-    clean_thread = threading.Thread(target=clean_uid, args=(uid_queue, uid_with_trash_queue, all_uid_list, shutdown))
-    main_thread = threading.Thread(target=listener, args=(process, shutdown,))
-    report_thread = threading.Thread(target=report, args=(uid_queue, uid_with_trash_queue, all_uid_list, shutdown))
-    clean_thread.start()
-    report_thread.start()
-    main_thread.start()
-    main_thread.join()
-    after_shut_down(all_uid_list, uid_queue, uid_with_trash_queue)
-
-
 def after_shut_down(all_uid_list, uid_queue, uid_with_trash_queue):
     print '>>>>>> 信息存储中'
     with open('all_uid_list', 'wb') as f_all_uid:
@@ -228,3 +212,106 @@ def master_process(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
     report_thread.start()
     shutdown_listener_thread.start()
     shutdown_listener_thread.join()
+
+
+# 分布式三个启动方法
+class QueueManager(BaseManager):
+    pass
+
+
+def start_master(port):
+    all_uid_list = []
+    uid_queue = Queue(200)
+    uid_with_trash_queue = Queue(500)
+    shutdown = Value('b', False)
+
+    QueueManager.register('get_uid_queue', callable=lambda: uid_queue)
+    QueueManager.register('get_uid_with_trash_queue', callable=lambda: uid_with_trash_queue)
+    QueueManager.register('get_shutdown', callable=lambda: shutdown)
+
+    manager = QueueManager(address=('', port), authkey=config.auth_key)
+    manager.start()
+
+    print '/////// 系统启动 - 主节点 ///////'
+
+    with open('all_uid_list', 'rb') as f_all_uid:
+        if f_all_uid.readline() != "":
+            f_all_uid.seek(0)
+            all_uid_list = pickle.load(f_all_uid)
+    print '>>>>>>> 初始化 总解析uid列表 完毕'
+
+    master = Process(target=master_process, args=(uid_queue, uid_with_trash_queue, all_uid_list, shutdown,))
+    master.start()
+
+    with open('uid_queue', 'rb') as f_uid_queue:
+        if f_uid_queue.readline() != "":
+            f_uid_queue.seek(0)
+            uid_list = pickle.load(f_uid_queue)
+            for uid in uid_list:
+                try:
+                    uid_queue.put(uid, timeout=60)
+                except Full:
+                    pass
+            if uid_queue.empty():
+                uid_queue.put(config.first_uid)
+    print '>>>>>>> 初始化 待解析uid列表 完毕'
+
+    with open('uid_with_trash', 'rb') as f_uid_with_trash:
+        if f_uid_with_trash.readline() != "":
+            f_uid_with_trash.seek(0)
+            uid_list = pickle.load(f_uid_with_trash)
+            for uid in uid_list:
+                try:
+                    uid_with_trash_queue.put(uid, timeout=60)
+                except Full:
+                    pass
+    print '>>>>>>> 初始化 待清洗uid列表 完毕'
+
+    master.join()
+    # 关闭服务
+    manager.shutdown()
+    after_shut_down(all_uid_list, uid_queue, uid_with_trash_queue)
+
+
+def start_download(port):
+    QueueManager.register('get_uid_queue')
+    QueueManager.register('get_shutdown')
+
+    manager = QueueManager(address=('127.0.0.1', port), authkey=config.auth_key)
+    manager.start()
+
+    uid_queue = manager.get_uid_queue()
+    shutdown = manager.get_shutdown()
+
+    process = []
+    for i in range(3):
+        process.append(Process(target=download_process, args=(uid_queue, shutdown,)))
+    start_process(process)
+    daemon_proc = Process(target=daemon_process, args=(process, shutdown,))
+    daemon_proc.start()
+    daemon_proc.join()
+    print '/////// 系统关闭 - 下载节点 ///////'
+
+
+def start_url_resolver(port):
+    print '/////// 系统启动 - 下载节点 ///////'
+
+    QueueManager.register('get_uid_with_trash_queue')
+    QueueManager.register('get_shutdown')
+
+    manager = QueueManager(address=('127.0.0.1', port), authkey=config.auth_key)
+    manager.start()
+
+    uid_with_trash_queue = manager.get_uid_with_trash_queue()
+    shutdown = manager.get_shutdown()
+
+    process = []
+    process.append(Process(target=followee_url_process, args=(uid_with_trash_queue, shutdown,)))
+    process.append(Process(target=follower_url_process, args=(uid_with_trash_queue, shutdown,)))
+
+    start_process(process)
+    daemon_proc = Process(target=daemon_process, args=(process, shutdown,))
+    daemon_proc.start()
+    daemon_proc.join()
+
+    print '/////// 系统关闭 - 下载节点 ///////'
