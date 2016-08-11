@@ -21,52 +21,6 @@ except ImportError:
     import pickle
 
 
-def init_spider():
-    shutdown = Value('b', False)
-    all_uid_list = []
-    uid_with_trash = Queue(500)
-    uid_queue = Queue(100)
-    uid_queue.put(config.first_uid)
-
-    print '///////////系统初始化///////////'
-    with open('all_uid_list', 'rb') as f_all_uid:
-        if f_all_uid.readline() != "":
-            f_all_uid.seek(0)
-            all_uid_list = pickle.load(f_all_uid)
-    print '>>>>>>> 初始化 总解析uid列表 完毕'
-
-    with open('uid_with_trash', 'rb') as f_uid_with_trash:
-        if f_uid_with_trash.readline() != "":
-            f_uid_with_trash.seek(0)
-            uid_list = pickle.load(f_uid_with_trash)
-            for uid in uid_list:
-                try:
-                    uid_with_trash.put(uid, block=False)
-                except Full:
-                    pass
-    print '>>>>>>> 初始化 待清洗uid列表 完毕'
-
-    with open('uid_queue', 'rb') as f_uid_queue:
-        if f_uid_queue.readline() != "":
-            f_uid_queue.seek(0)
-            uid_queue.get(timeout=15)
-            uid_list = pickle.load(f_uid_queue)
-            for uid in uid_list:
-                try:
-                    uid_queue.put(uid, block=False)
-                except Full:
-                    pass
-    print '>>>>>>> 初始化 待解析uid列表 完毕'
-    print '///////////初始化完毕///////////\n'
-
-    return [
-        all_uid_list,
-        uid_queue,
-        uid_with_trash,
-        shutdown,
-    ]
-
-
 def download_process(uid_queue, shutdown):
     while not shutdown.value:
         uid = uid_queue.get(timeout=15)
@@ -206,12 +160,9 @@ def after_shut_down(all_uid_list, uid_queue, uid_with_trash_queue):
 
 def master_process(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
     clean_thread = threading.Thread(target=clean_uid, args=(uid_queue, uid_with_trash_queue, all_uid_list, shutdown))
-    shutdown_listener_thread = threading.Thread(target=shutdown_listener, args=(shutdown,))
     report_thread = threading.Thread(target=report, args=(uid_queue, uid_with_trash_queue, all_uid_list, shutdown))
     clean_thread.start()
     report_thread.start()
-    shutdown_listener_thread.start()
-    shutdown_listener_thread.join()
 
 
 # 分布式三个启动方法
@@ -267,6 +218,9 @@ def start_master(port):
                     pass
     print '>>>>>>> 初始化 待清洗uid列表 完毕'
 
+    shutdown_listener_thread = threading.Thread(target=shutdown_listener, args=(shutdown,))
+    shutdown_listener_thread.start()
+    shutdown_listener_thread.join()
     master.join()
     # 关闭服务
     manager.shutdown()
@@ -278,7 +232,7 @@ def start_download(port):
     QueueManager.register('get_shutdown')
 
     manager = QueueManager(address=('127.0.0.1', port), authkey=config.auth_key)
-    manager.start()
+    manager.connect()
 
     uid_queue = manager.get_uid_queue()
     shutdown = manager.get_shutdown()
@@ -300,7 +254,7 @@ def start_url_resolver(port):
     QueueManager.register('get_shutdown')
 
     manager = QueueManager(address=('127.0.0.1', port), authkey=config.auth_key)
-    manager.start()
+    manager.connect()
 
     uid_with_trash_queue = manager.get_uid_with_trash_queue()
     shutdown = manager.get_shutdown()
