@@ -1,7 +1,6 @@
 # coding=utf-8
 import time
 from Queue import Full
-
 import config
 import download
 import resolver
@@ -58,6 +57,7 @@ def init_spider():
                     pass
     print '>>>>>>> 初始化 待解析uid列表 完毕'
     print '///////////初始化完毕///////////\n'
+
     return [
         all_uid_list,
         uid_queue,
@@ -150,25 +150,15 @@ def report(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
         print "////////////数据报告////////////\n"
 
 
-def listener(procs, shutdown):
-    for proc in procs:
-        proc.start()
-
-    daemon_thread = threading.Thread(target=daemon_process, args=(procs, shutdown,))
-    daemon_thread.start()
-
+def shutdown_listener(shutdown):
     while raw_input() != 'exit':
         continue
     shutdown.value = True
 
-    daemon_thread.join()
-    for proc in procs:
-        proc.join()
 
+def start_process(procs):
     for proc in procs:
-        if proc.is_alive():
-            print proc.name, 'is not shutdown'
-            print '\n/////////系统关闭失败！/////////'
+        proc.start()
 
 
 def daemon_process(procs, shutdown):
@@ -230,15 +220,11 @@ def after_shut_down(all_uid_list, uid_queue, uid_with_trash_queue):
     print '\n/////////系统关闭！/////////'
 
 
-# spider begin
-# command is
-#         type(m master,d only download,c only control, dc down and control)
-#         port(integer)
-if __name__ == '__main__':
-    # commands = sys.argv
-    persistence.start_session()
-    init_param = init_spider()
-    start_process(all_uid_list=init_param[0],
-                  uid_queue=init_param[1],
-                  uid_with_trash_queue=init_param[2],
-                  shutdown=init_param[3])
+def master_process(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
+    clean_thread = threading.Thread(target=clean_uid, args=(uid_queue, uid_with_trash_queue, all_uid_list, shutdown))
+    shutdown_listener_thread = threading.Thread(target=shutdown_listener, args=(shutdown,))
+    report_thread = threading.Thread(target=report, args=(uid_queue, uid_with_trash_queue, all_uid_list, shutdown))
+    clean_thread.start()
+    report_thread.start()
+    shutdown_listener_thread.start()
+    shutdown_listener_thread.join()

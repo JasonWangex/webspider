@@ -13,7 +13,7 @@ header = {
     "X-Xsrftoken": "dfc53894182c9598883cc5574e97738b",
 }
 first_uid = "boxun"
-
+auth_key = "asdfasldfhaskn45576asd5fas6df43as6as7f6as4"
 
 
 # header = '''Accept:*/*
