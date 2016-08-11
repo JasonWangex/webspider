@@ -1,5 +1,7 @@
 # coding=utf-8
 import time
+from Queue import Full
+
 import config
 import download
 import resolver
@@ -23,7 +25,7 @@ def init_spider():
     shutdown = Value('b', False)
     all_uid_list = []
     uid_with_trash = Queue(500)
-    uid_queue = Queue(500)
+    uid_queue = Queue(100)
     uid_queue.put(config.first_uid)
 
     print '///////////系统初始化///////////'
@@ -38,7 +40,10 @@ def init_spider():
             f_uid_with_trash.seek(0)
             uid_list = pickle.load(f_uid_with_trash)
             for uid in uid_list:
-                uid_with_trash.put(uid)
+                try:
+                    uid_with_trash.put(uid, block=False)
+                except Full:
+                    pass
     print '>>>>>>> 初始化 待清洗uid列表 完毕'
 
     with open('uid_queue', 'rb') as f_uid_queue:
@@ -47,7 +52,10 @@ def init_spider():
             uid_queue.get(timeout=15)
             uid_list = pickle.load(f_uid_queue)
             for uid in uid_list:
-                uid_queue.put(uid)
+                try:
+                    uid_queue.put(uid, block=False)
+                except Full:
+                    pass
     print '>>>>>>> 初始化 待解析uid列表 完毕'
     print '///////////初始化完毕///////////\n'
     return [
@@ -84,13 +92,20 @@ def followee_url_process(uid_with_trash_queue, shutdown):
         if current_user is None:
             continue
 
-        max_followee_page = 0 if current_user.followees == 0 else current_user.followees % 20 + 1
+        max_followee_page = 0 if current_user.followees == 0 else current_user.followees / 20 + 1
         while current_user.getFollowees < max_followee_page:
             msg = download.get_followees(hash_id=current_user.hashId, page=current_user.getFollowees)
             current_user.getFollowees += 1
             uids = resolver.resolve_for_uids(msg)
             for uid in uids:
-                uid_with_trash_queue.put(uid)
+                try:
+                    uid_with_trash_queue.put(uid, timeout=10)
+                except Full:
+                    if shutdown.value:
+                        return
+                    else:
+                        print ">>>>>", uid, "is lost!"
+                        continue
             user_dao.save_or_update(current_user)
         current_user.needGetFollowees = False
         current_user.getFollowees = max_followee_page
@@ -103,16 +118,21 @@ def follower_url_process(uid_with_trash_queue, shutdown):
         if current_user is None:
             continue
 
-        max_follower_page = 0 if current_user.followers == 0 else current_user.followers % 20 + 1
+        max_follower_page = 0 if current_user.followers == 0 else current_user.followers / 20 + 1
         while current_user.getFollowers < max_follower_page:
             msg = download.get_followers(hash_id=current_user.hashId, page=current_user.getFollowers)
             current_user.getFollowers += 1
             uids = resolver.resolve_for_uids(msg)
-
             for uid in uids:
-                uid_with_trash_queue.put(uid)
+                try:
+                    uid_with_trash_queue.put(uid, timeout=10)
+                except Full:
+                    if shutdown.value:
+                        return
+                    else:
+                        print ">>>>>", uid, "is lost!"
+                        continue
             user_dao.save_or_update(current_user)
-
         current_user.needGetFollowers = False
         current_user.getFollowers = max_follower_page
         user_dao.save_or_update(current_user)
@@ -133,9 +153,15 @@ def report(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
 def listener(procs, shutdown):
     for proc in procs:
         proc.start()
+
+    daemon_thread = threading.Thread(target=daemon_process, args=(procs, shutdown,))
+    daemon_thread.start()
+
     while raw_input() != 'exit':
         continue
     shutdown.value = True
+
+    daemon_thread.join()
     for proc in procs:
         proc.join()
 
@@ -143,6 +169,15 @@ def listener(procs, shutdown):
         if proc.is_alive():
             print proc.name, 'is not shutdown'
             print '\n/////////系统关闭失败！/////////'
+
+
+def daemon_process(procs, shutdown):
+    while not shutdown:
+        for proc in procs:
+            if not proc.is_alive():
+                new_proc = Process(target=proc._target, args=proc._args)
+                new_proc.start()
+        time.sleep(5)
 
 
 def clean_uid(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
@@ -185,7 +220,7 @@ def after_shut_down(all_uid_list, uid_queue, uid_with_trash_queue):
         pickle.dump(uid_list, file=f_uid_queue)
     print '>>>>>> 待解析uid列表 存储完毕'
 
-    with open('uid_queue', 'wb') as f_uid_with_trash_queue:
+    with open('uid_with_trash', 'wb') as f_uid_with_trash_queue:
         uid_list = []
         while not uid_with_trash_queue.empty():
             uid = uid_with_trash_queue.get(timeout=15)
