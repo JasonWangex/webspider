@@ -98,7 +98,7 @@ def report(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
     while not shutdown.get():
         time.sleep(10)
         if shutdown.get():
-            return
+            break
         print "\n////////////数据报告////////////"
         print ">>>> 待解析 uid 列表: ", uid_queue.qsize()
         print ">>>> 待清洗 uid 列表: ", uid_with_trash_queue.qsize()
@@ -134,7 +134,7 @@ def clean_uid(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
             all_uid_list.append(waiting_clean_uid)
 
 
-def after_shut_down(all_uid_list, uid_queue, uid_with_trash_queue):
+def before_shut_down(all_uid_list, uid_queue, uid_with_trash_queue):
     print '>>>>>> 信息存储中'
     with open('all_uid_list', 'wb') as f_all_uid:
         pickle.dump(all_uid_list, file=f_all_uid)
@@ -223,10 +223,10 @@ def start_master(port):
     shutdown_listener_thread = threading.Thread(target=shutdown_listener, args=(shutdown,))
     shutdown_listener_thread.start()
     shutdown_listener_thread.join()
-    master.join()
+    report_thread.join()
     # 关闭服务
+    before_shut_down(all_uid_list, uid_queue, uid_with_trash_queue)
     manager.shutdown()
-    after_shut_down(all_uid_list, uid_queue, uid_with_trash_queue)
 
 
 def start_download(port):
