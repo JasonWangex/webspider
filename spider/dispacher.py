@@ -1,8 +1,8 @@
 # coding=utf-8
 import time
-from Queue import Full
+from Queue import Full, Empty
 
-from multiprocessing.managers import BaseManager
+from multiprocessing.managers import BaseManager, Value
 
 import config
 import download
@@ -13,7 +13,8 @@ from persistence import user_dao
 from persistence import failed_dao
 from multiprocessing import Process
 from multiprocessing import Queue
-from multiprocessing import Value
+
+from spider import persistence
 
 try:
     import cPickle as pickle
@@ -22,7 +23,7 @@ except ImportError:
 
 
 def download_process(uid_queue, shutdown):
-    while not shutdown.value:
+    while not shutdown.get():
         uid = uid_queue.get(timeout=15)
         url = resolver.get_url_by_uid(uid)
         content = download.get_content(url)
@@ -42,7 +43,7 @@ def resolve_thread(content):
 
 
 def followee_url_process(uid_with_trash_queue, shutdown):
-    while not shutdown.value:
+    while not shutdown.get():
         current_user = user_dao.get_user_for_followees()
         if current_user is None:
             continue
@@ -56,7 +57,7 @@ def followee_url_process(uid_with_trash_queue, shutdown):
                 try:
                     uid_with_trash_queue.put(uid, timeout=10)
                 except Full:
-                    if shutdown.value:
+                    if shutdown.get():
                         return
                     else:
                         print ">>>>>", uid, "is lost!"
@@ -68,7 +69,7 @@ def followee_url_process(uid_with_trash_queue, shutdown):
 
 
 def follower_url_process(uid_with_trash_queue, shutdown):
-    while not shutdown.value:
+    while not shutdown.get():
         current_user = user_dao.get_user_for_followers()
         if current_user is None:
             continue
@@ -82,7 +83,7 @@ def follower_url_process(uid_with_trash_queue, shutdown):
                 try:
                     uid_with_trash_queue.put(uid, timeout=10)
                 except Full:
-                    if shutdown.value:
+                    if shutdown.get():
                         return
                     else:
                         print ">>>>>", uid, "is lost!"
@@ -94,9 +95,9 @@ def follower_url_process(uid_with_trash_queue, shutdown):
 
 
 def report(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
-    while not shutdown.value:
+    while not shutdown.get():
         time.sleep(10)
-        if shutdown.value:
+        if shutdown.get():
             return
         print "\n////////////数据报告////////////"
         print ">>>> 待解析 uid 列表: ", uid_queue.qsize()
@@ -108,7 +109,7 @@ def report(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
 def shutdown_listener(shutdown):
     while raw_input() != 'exit':
         continue
-    shutdown.value = True
+    shutdown.set(True)
 
 
 def start_process(procs):
@@ -126,7 +127,7 @@ def daemon_process(procs, shutdown):
 
 
 def clean_uid(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
-    while not shutdown.value:
+    while not shutdown.get():
         waiting_clean_uid = uid_with_trash_queue.get(timeout=15)
         if waiting_clean_uid not in all_uid_list:
             uid_queue.put(waiting_clean_uid)
@@ -151,21 +152,16 @@ def after_shut_down(all_uid_list, uid_queue, uid_with_trash_queue):
     with open('uid_with_trash', 'wb') as f_uid_with_trash_queue:
         uid_list = []
         while not uid_with_trash_queue.empty():
-            uid = uid_with_trash_queue.get(timeout=15)
+            try:
+                uid = uid_with_trash_queue.get(timeout=15)
+            except Empty:
+                continue
             uid_list.append(uid)
         pickle.dump(uid_list, file=f_uid_with_trash_queue)
     print '>>>>>> 待清洗uid列表 存储完毕'
     print '\n/////////系统关闭！/////////'
 
 
-def master_process(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
-    clean_thread = threading.Thread(target=clean_uid, args=(uid_queue, uid_with_trash_queue, all_uid_list, shutdown))
-    report_thread = threading.Thread(target=report, args=(uid_queue, uid_with_trash_queue, all_uid_list, shutdown))
-    clean_thread.start()
-    report_thread.start()
-
-
-# 分布式三个启动方法
 class QueueManager(BaseManager):
     pass
 
@@ -174,7 +170,7 @@ def start_master(port):
     all_uid_list = []
     uid_queue = Queue(200)
     uid_with_trash_queue = Queue(500)
-    shutdown = Value('b', False)
+    shutdown = Value('i', False)
 
     QueueManager.register('get_uid_queue', callable=lambda: uid_queue)
     QueueManager.register('get_uid_with_trash_queue', callable=lambda: uid_with_trash_queue)
@@ -182,6 +178,10 @@ def start_master(port):
 
     manager = QueueManager(address=('', port), authkey=config.auth_key)
     manager.start()
+
+    uid_queue = manager.get_uid_queue()
+    uid_with_trash_queue = manager.get_uid_with_trash_queue()
+    shutdown = manager.get_shutdown()
 
     print '/////// 系统启动 - 主节点 ///////'
 
@@ -191,8 +191,10 @@ def start_master(port):
             all_uid_list = pickle.load(f_all_uid)
     print '>>>>>>> 初始化 总解析uid列表 完毕'
 
-    master = Process(target=master_process, args=(uid_queue, uid_with_trash_queue, all_uid_list, shutdown,))
-    master.start()
+    clean_thread = threading.Thread(target=clean_uid, args=(uid_queue, uid_with_trash_queue, all_uid_list, shutdown))
+    clean_thread.start()
+    report_thread = threading.Thread(target=report, args=(uid_queue, uid_with_trash_queue, all_uid_list, shutdown))
+    report_thread.start()
 
     with open('uid_queue', 'rb') as f_uid_queue:
         if f_uid_queue.readline() != "":
@@ -228,6 +230,8 @@ def start_master(port):
 
 
 def start_download(port):
+    print '/////// 系统启动 - 下载节点 ///////'
+    persistence.start_session()
     QueueManager.register('get_uid_queue')
     QueueManager.register('get_shutdown')
 
@@ -244,11 +248,11 @@ def start_download(port):
     daemon_proc = Process(target=daemon_process, args=(process, shutdown,))
     daemon_proc.start()
     daemon_proc.join()
-    print '/////// 系统关闭 - 下载节点 ///////'
 
 
 def start_url_resolver(port):
-    print '/////// 系统启动 - 下载节点 ///////'
+    persistence.start_session()
+    print '/////// 系统启动 - RUL节点 ///////'
 
     QueueManager.register('get_uid_with_trash_queue')
     QueueManager.register('get_shutdown')
@@ -267,5 +271,3 @@ def start_url_resolver(port):
     daemon_proc = Process(target=daemon_process, args=(process, shutdown,))
     daemon_proc.start()
     daemon_proc.join()
-
-    print '/////// 系统关闭 - 下载节点 ///////'

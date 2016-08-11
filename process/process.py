@@ -1,10 +1,10 @@
-from multiprocessing import Process, Value
+from multiprocessing import Process
 import random, time, Queue
-from multiprocessing.managers import BaseManager
+from multiprocessing.managers import BaseManager, Value
 
 task_queue = Queue.Queue()
 result_queue = Queue.Queue()
-a_value = Value('b', False)
+a_value = Value('i', 99)
 
 
 class QueueManager(BaseManager):

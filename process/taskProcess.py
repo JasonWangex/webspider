@@ -28,6 +28,7 @@ for i in range(10):
         time.sleep(0.5)
         result.put(r)
         th = val
+        print th.get()
     except Queue.Empty:
         print 'task is empty', val
 
