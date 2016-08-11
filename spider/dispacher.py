@@ -23,7 +23,7 @@ def init_spider():
     shutdown = Value('b', False)
     all_uid_list = []
     uid_with_trash = Queue(500)
-    uid_queue = Queue(200)
+    uid_queue = Queue(500)
     uid_queue.put(config.first_uid)
 
     print '///////////系统初始化///////////'
@@ -44,7 +44,7 @@ def init_spider():
     with open('uid_queue', 'rb') as f_uid_queue:
         if f_uid_queue.readline() != "":
             f_uid_queue.seek(0)
-            uid_queue.get(timeout=10)
+            uid_queue.get(timeout=15)
             uid_list = pickle.load(f_uid_queue)
             for uid in uid_list:
                 uid_queue.put(uid)
@@ -58,9 +58,9 @@ def init_spider():
     ]
 
 
-def download_thread(uid_queue, shutdown):
+def download_process(uid_queue, shutdown):
     while not shutdown.value:
-        uid = uid_queue.get(timeout=10)
+        uid = uid_queue.get(timeout=15)
         url = resolver.get_url_by_uid(uid)
         content = download.get_content(url)
         threading.Thread(target=resolve_thread, args=(content,)).start()
@@ -118,7 +118,7 @@ def follower_url_process(uid_with_trash_queue, shutdown):
         user_dao.save_or_update(current_user)
 
 
-def report(shutdown, uid_queue, uid_with_trash_queue, all_uid_list):
+def report(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
     while not shutdown.value:
         time.sleep(10)
         if shutdown.value:
@@ -135,40 +135,37 @@ def listener(procs, shutdown):
         proc.start()
     while raw_input() != 'exit':
         continue
+    shutdown.value = True
     for proc in procs:
         proc.join()
 
-    shutdown.value = True
-    time.sleep(1)
-    print '系统将在 10 秒之后进入关闭流程！'
-    for i in range(9, 0, -1):
-        time.sleep(1)
-        print i
-
     for proc in procs:
-        if proc.isAlive():
+        if proc.is_alive():
             print proc.name, 'is not shutdown'
-    print '\n/////////系统关闭！/////////'
+            print '\n/////////系统关闭失败！/////////'
 
 
 def clean_uid(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
-    while not shutdown:
-        waiting_clean_uid = uid_with_trash_queue.get()
+    while not shutdown.value:
+        waiting_clean_uid = uid_with_trash_queue.get(timeout=15)
         if waiting_clean_uid not in all_uid_list:
             uid_queue.put(waiting_clean_uid)
+            all_uid_list.append(waiting_clean_uid)
 
 
-def start_process(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
+def start_process(all_uid_list, uid_queue, uid_with_trash_queue, shutdown):
     process = []
-    for i in range(1, 5):
-        process.append(Process(target=download, args=(uid_queue, shutdown,)))
+    for i in range(1, 3):
+        process.append(Process(target=download_process, args=(uid_queue, shutdown,)))
 
     process.append(Process(target=followee_url_process, args=(uid_with_trash_queue, shutdown,)))
     process.append(Process(target=follower_url_process, args=(uid_with_trash_queue, shutdown,)))
     clean_thread = threading.Thread(target=clean_uid, args=(uid_queue, uid_with_trash_queue, all_uid_list, shutdown))
     main_thread = threading.Thread(target=listener, args=(process, shutdown,))
-    main_thread.start()
+    report_thread = threading.Thread(target=report, args=(uid_queue, uid_with_trash_queue, all_uid_list, shutdown))
     clean_thread.start()
+    report_thread.start()
+    main_thread.start()
     main_thread.join()
     after_shut_down(all_uid_list, uid_queue, uid_with_trash_queue)
 
@@ -183,7 +180,7 @@ def after_shut_down(all_uid_list, uid_queue, uid_with_trash_queue):
         # queue 无法序列化, 只能转成list
         uid_list = []
         while not uid_queue.empty():
-            uid = uid_queue.get(timeout=10)
+            uid = uid_queue.get(timeout=15)
             uid_list.append(uid)
         pickle.dump(uid_list, file=f_uid_queue)
     print '>>>>>> 待解析uid列表 存储完毕'
@@ -191,10 +188,11 @@ def after_shut_down(all_uid_list, uid_queue, uid_with_trash_queue):
     with open('uid_queue', 'wb') as f_uid_with_trash_queue:
         uid_list = []
         while not uid_with_trash_queue.empty():
-            uid = uid_with_trash_queue.get(timeout=10)
+            uid = uid_with_trash_queue.get(timeout=15)
             uid_list.append(uid)
         pickle.dump(uid_list, file=f_uid_with_trash_queue)
     print '>>>>>> 待清洗uid列表 存储完毕'
+    print '\n/////////系统关闭！/////////'
 
 
 # spider begin
