@@ -128,7 +128,10 @@ def daemon_process(procs, shutdown):
 
 def clean_uid(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
     while not shutdown.get():
-        waiting_clean_uid = uid_with_trash_queue.get(timeout=15)
+        try:
+            waiting_clean_uid = uid_with_trash_queue.get(timeout=15)
+        except Empty:
+            continue
         if waiting_clean_uid not in all_uid_list:
             uid_queue.put(waiting_clean_uid)
             all_uid_list.append(waiting_clean_uid)
