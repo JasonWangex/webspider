@@ -5,7 +5,7 @@ import sys
 # command is
 #         type(m master,d only download,u only url resolver)
 #         port(integer)
-from spider import dispacher
+import dispacher
 
 if __name__ == '__main__':
     commands = sys.argv
