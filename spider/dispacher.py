@@ -14,7 +14,7 @@ from persistence import failed_dao
 from multiprocessing import Process
 from multiprocessing import Queue
 
-from spider import persistence
+import persistence
 
 try:
     import cPickle as pickle
