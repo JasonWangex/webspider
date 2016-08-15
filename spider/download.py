@@ -16,7 +16,7 @@ def get_content2(url):
 
 
 def get_content(url):
-    resp = requests.get(url, headers=config.header)
+    resp = requests.get(url, headers=config.header, verify=False)
     return resp.content
 
 
