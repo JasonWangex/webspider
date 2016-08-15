@@ -232,20 +232,20 @@ def start_master(port):
     manager.shutdown()
 
 
-def start_download(port):
+def start_download(address, port):
     print '/////// 系统启动 - 下载节点 ///////'
     persistence.start_session()
     QueueManager.register('get_uid_queue')
     QueueManager.register('get_shutdown')
 
-    manager = QueueManager(address=('127.0.0.1', port), authkey=config.auth_key)
+    manager = QueueManager(address=(address, port), authkey=config.auth_key)
     manager.connect()
 
     uid_queue = manager.get_uid_queue()
     shutdown = manager.get_shutdown()
 
     process = []
-    for i in range(3):
+    for i in range(2):
         process.append(Process(target=download_process, args=(uid_queue, shutdown,)))
     start_process(process)
     daemon_proc = Process(target=daemon_process, args=(process, shutdown,))
@@ -253,14 +253,14 @@ def start_download(port):
     daemon_proc.join()
 
 
-def start_url_resolver(port):
+def start_url_resolver(address, port):
     persistence.start_session()
     print '/////// 系统启动 - RUL节点 ///////'
 
     QueueManager.register('get_uid_with_trash_queue')
     QueueManager.register('get_shutdown')
 
-    manager = QueueManager(address=('127.0.0.1', port), authkey=config.auth_key)
+    manager = QueueManager(address=(address, port), authkey=config.auth_key)
     manager.connect()
 
     uid_with_trash_queue = manager.get_uid_with_trash_queue()

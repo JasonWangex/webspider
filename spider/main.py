@@ -11,7 +11,8 @@ if __name__ == '__main__':
     commands = sys.argv
 
     command_type = commands[1]
-    port = commands[2]
+    address = commands[2]
+    port = commands[3]
 
     try:
         port = int(port)
@@ -22,10 +23,10 @@ if __name__ == '__main__':
         dispacher.start_master(port)
 
     elif command_type == 'd':
-        dispacher.start_download(port)
+        dispacher.start_download(address, port)
 
     elif command_type == 'u':
-        dispacher.start_url_resolver(port)
+        dispacher.start_url_resolver(address, port)
 
     else:
         print 'can\'t start without command type'
