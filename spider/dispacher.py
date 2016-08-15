@@ -129,7 +129,7 @@ def daemon_process(procs, shutdown):
 def clean_uid(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
     while not shutdown.get():
         try:
-            waiting_clean_uid = uid_with_trash_queue.get(timeout=15)
+            waiting_clean_uid = uid_with_trash_queue.get(timeout=10)
         except Empty:
             continue
         if waiting_clean_uid not in all_uid_list:
@@ -203,13 +203,15 @@ def start_master(port):
         if f_uid_queue.readline() != "":
             f_uid_queue.seek(0)
             uid_list = pickle.load(f_uid_queue)
+            if len(uid_list) == 0:
+                uid_queue.put(config.first_uid)
+
             for uid in uid_list:
                 try:
                     uid_queue.put(uid, timeout=60)
                 except Full:
                     pass
-            if uid_queue.empty():
-                uid_queue.put(config.first_uid)
+
     print '>>>>>>> 初始化 待解析uid列表 完毕'
 
     with open('uid_with_trash', 'rb') as f_uid_with_trash:

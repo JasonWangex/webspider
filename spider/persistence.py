@@ -12,7 +12,7 @@ DBSession = None
 def start_session():
     global engine
     global DBSession
-    engine = create_engine('mysql+mysqlconnector://cdb_outerroot:pPZKSiC2Kkmpt54@57b17a81a1ef5.sh.cdb.myqcloud.com:6065/zhihu_users?charset=utf8mb4')
+    engine = create_engine('mysql+mysqlconnector://cdb_outerroot:cdb_outerroot@57b17a81a1ef5.sh.cdb.myqcloud.com:6065/zhihu_users?charset=utf8mb4')
     DBSession = sessionmaker(bind=engine)
 
 
