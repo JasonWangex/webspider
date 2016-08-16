@@ -4,6 +4,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.exc import NoResultFound
 
 from Domain import User
+from Domain import Cookies
 
 engine = None
 DBSession = None
@@ -12,7 +13,8 @@ DBSession = None
 def start_session():
     global engine
     global DBSession
-    engine = create_engine('mysql+mysqlconnector://cdb_outerroot:cdb_outerroot@57b17a81a1ef5.sh.cdb.myqcloud.com:6065/zhihu_users?charset=utf8mb4')
+    engine = create_engine(
+        'mysql+mysqlconnector://cdb_outerroot:cdb_outerroot@57b17a81a1ef5.sh.cdb.myqcloud.com:6065/zhihu_users?charset=utf8mb4')
     DBSession = sessionmaker(bind=engine)
 
 
@@ -90,5 +92,25 @@ class failed_dao(object):
             failed.id = None
             session.add(failed)
             session.commit()
+        finally:
+            session.close()
+
+
+class cookies_dao(object):
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def get_one_with_lock():
+        global DBSession
+        session = DBSession()
+        try:
+            cookie = session.query(Cookies).filter(Cookies.available == True).first()
+            cookie.available = False
+            session.add(cookie)
+            session.commit()
+            return cookie
+        except NoResultFound:
+            pass
         finally:
             session.close()

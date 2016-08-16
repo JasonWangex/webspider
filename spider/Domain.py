@@ -33,3 +33,14 @@ class Failed(Base):
     __tablename__ = 'failed'
     id = Column(Integer, primary_key=True, autoincrement=True)
     content = Column(String)
+
+
+class Cookies(Base):
+    __tablename__ = 'cookies'
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    cookie = Column(String, default="")
+    xsrf = Column(String, default="")
+    relation = Column(String, default="")
+    available = Column(Boolean, default=True)
+    disabled = Column(Boolean, default=False)
+
