@@ -21,9 +21,15 @@ try:
 except ImportError:
     import pickle
 
+failedCount = 0
 
-def download_process(uid_queue, shutdown):
-    while not shutdown.get():
+
+def download_process(uid_queue, shutdown, localShutdown):
+    global failedCount
+    while not (shutdown.get() or localShutdown.value):
+        if failedCount > 5:
+            print '//////////Download failed!!!//////////'
+            break
         uid = uid_queue.get(timeout=15)
         url = resolver.get_url_by_uid(uid)
         content = download.get_content(url)
@@ -31,33 +37,37 @@ def download_process(uid_queue, shutdown):
 
 
 def resolve_thread(content):
+    global failedCount
     try:
         user = resolver.resolve_for_user(content)
         print '解析>>>>>>', user.uid
         user_dao.save_or_update(user)
+        failedCount = 0
     except AttributeError:
         print '///////////解析失败////////////'
         failed = Failed()
         failed.content = content
         failed_dao.save(failed)
+        failedCount += 1
 
 
-def followee_url_process(uid_with_trash_queue, shutdown):
-    while not shutdown.get():
+def followee_url_process(uid_with_trash_queue, shutdown, localShutdown):
+    while not (shutdown.get() or localShutdown.value):
         current_user = user_dao.get_user_for_followees()
         if current_user is None:
             continue
 
         max_followee_page = 0 if current_user.followees == 0 else current_user.followees / 20 + 1
-        while current_user.getFollowees < max_followee_page:
+        while current_user.getFollowees < max_followee_page and not (shutdown.get() or localShutdown.value):
             msg = download.get_followees(hash_id=current_user.hashId, page=current_user.getFollowees)
             current_user.getFollowees += 1
+            print ">>>>> URL下载成功 - Followee ", current_user.getFollowees
             uids = resolver.resolve_for_uids(msg)
             for uid in uids:
                 try:
                     uid_with_trash_queue.put(uid, timeout=10)
                 except Full:
-                    if shutdown.get():
+                    if shutdown.get() or localShutdown.value:
                         return
                     else:
                         print ">>>>>", uid, "is lost!"
@@ -68,22 +78,23 @@ def followee_url_process(uid_with_trash_queue, shutdown):
         user_dao.save_or_update(current_user)
 
 
-def follower_url_process(uid_with_trash_queue, shutdown):
-    while not shutdown.get():
+def follower_url_process(uid_with_trash_queue, shutdown, localShutdown):
+    while not (shutdown.get() or localShutdown.value):
         current_user = user_dao.get_user_for_followers()
         if current_user is None:
             continue
 
         max_follower_page = 0 if current_user.followers == 0 else current_user.followers / 20 + 1
-        while current_user.getFollowers < max_follower_page:
+        while current_user.getFollowers < max_follower_page and not (shutdown.get() or localShutdown.value):
             msg = download.get_followers(hash_id=current_user.hashId, page=current_user.getFollowers)
             current_user.getFollowers += 1
+            print ">>>>> URL下载成功 - Follower ", current_user.getFollowers
             uids = resolver.resolve_for_uids(msg)
             for uid in uids:
                 try:
                     uid_with_trash_queue.put(uid, timeout=10)
                 except Full:
-                    if shutdown.get():
+                    if shutdown.get() or localShutdown.value:
                         return
                     else:
                         print ">>>>>", uid, "is lost!"
@@ -112,13 +123,19 @@ def shutdown_listener(shutdown):
     shutdown.set(True)
 
 
+def local_shutdown_listener(localShutdown):
+    while raw_input() != 'exit':
+        continue
+    localShutdown.value = True
+
+
 def start_process(procs):
     for proc in procs:
         proc.start()
 
 
-def daemon_process(procs, shutdown):
-    while not shutdown:
+def daemon_process(procs, shutdown, localShutdown):
+    while not (shutdown or localShutdown.value):
         for proc in procs:
             if not proc.is_alive():
                 new_proc = Process(target=proc._target, args=proc._args)
@@ -234,7 +251,7 @@ def start_master(port):
     manager.shutdown()
 
 
-def start_download(address, port):
+def start_download(address, port, localShutdown):
     print '/////// 系统启动 - 下载节点 ///////'
     persistence.start_session()
     QueueManager.register('get_uid_queue')
@@ -248,14 +265,15 @@ def start_download(address, port):
 
     process = []
     for i in range(2):
-        process.append(Process(target=download_process, args=(uid_queue, shutdown,)))
+        process.append(Process(target=download_process, args=(uid_queue, shutdown, localShutdown,)))
     start_process(process)
-    daemon_proc = Process(target=daemon_process, args=(process, shutdown,))
+    daemon_proc = Process(target=daemon_process, args=(process, shutdown, localShutdown,))
     daemon_proc.start()
+    local_shutdown_listener(localShutdown)
     daemon_proc.join()
 
 
-def start_url_resolver(address, port):
+def start_url_resolver(address, port, localShutdown):
     persistence.start_session()
     print '/////// 系统启动 - RUL节点 ///////'
 
@@ -269,10 +287,11 @@ def start_url_resolver(address, port):
     shutdown = manager.get_shutdown()
 
     process = []
-    process.append(Process(target=followee_url_process, args=(uid_with_trash_queue, shutdown,)))
-    process.append(Process(target=follower_url_process, args=(uid_with_trash_queue, shutdown,)))
-
+    process.append(Process(target=followee_url_process, args=(uid_with_trash_queue, shutdown, localShutdown,)))
+    process.append(Process(target=follower_url_process, args=(uid_with_trash_queue, shutdown, localShutdown,)))
     start_process(process)
-    daemon_proc = Process(target=daemon_process, args=(process, shutdown,))
+
+    daemon_proc = Process(target=daemon_process, args=(process, shutdown, localShutdown,))
     daemon_proc.start()
+    local_shutdown_listener(localShutdown)
     daemon_proc.join()

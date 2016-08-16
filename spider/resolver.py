@@ -100,11 +100,14 @@ def resolve_for_user(response):
 
 
 def resolve_for_uids(response):
-    response = json.JSONDecoder().decode(response)
-    msg = response['msg']
     urls = []
-    for item in msg:
-        urls.append(resolve_for_uid(item))
+    try:
+        response = json.JSONDecoder().decode(response)
+        msg = response['msg']
+        for item in msg:
+            urls.append(resolve_for_uid(item))
+    except ValueError:
+        pass
     return urls
 
 

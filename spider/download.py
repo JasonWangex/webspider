@@ -2,6 +2,9 @@
 import requests
 import urllib2
 import time
+
+from requests.exceptions import SSLError
+
 import config
 import json
 
@@ -16,8 +19,10 @@ def get_content2(url):
 
 
 def get_content(url):
-    time.sleep(0.2)
-    resp = requests.get(url, headers=config.header)
+    try:
+        resp = requests.get(url, headers=config.header)
+    except SSLError:
+        return u""
     return resp.content
 
 

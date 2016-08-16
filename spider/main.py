@@ -5,6 +5,8 @@ import sys
 # command is
 #         type(m master,d only download,u only url resolver)
 #         port(integer)
+from multiprocessing import Value
+
 import dispacher
 
 if __name__ == '__main__':
@@ -14,6 +16,7 @@ if __name__ == '__main__':
     address = commands[2]
     port = commands[3]
 
+    localShutdown = Value('b', False)
     try:
         port = int(port)
     except ValueError:
@@ -23,10 +26,10 @@ if __name__ == '__main__':
         dispacher.start_master(port)
 
     elif command_type == 'd':
-        dispacher.start_download(address, port)
+        dispacher.start_download(address, port, localShutdown)
 
     elif command_type == 'u':
-        dispacher.start_url_resolver(address, port)
+        dispacher.start_url_resolver(address, port, localShutdown)
 
     else:
         print 'can\'t start without command type'
