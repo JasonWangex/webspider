@@ -16,7 +16,8 @@ def get_content2(url):
 
 
 def get_content(url):
-    resp = requests.get(url, headers=config.header, verify=False)
+    time.sleep(0.2)
+    resp = requests.get(url, headers=config.header)
     return resp.content
 
 
