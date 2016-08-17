@@ -340,8 +340,8 @@ def start_url_resolver(address, port, localShutdown):
     follower_lock = manager.get_follower_url_lock()
 
     process = [
-        Process(target=followee_url_process, args=(uid_with_trash_queue, True, followee_lock, shutdown, localShutdown,)),
-        # Process(target=follower_url_process, args=(uid_with_trash_queue, True, followee_lock, shutdown, localShutdown,)),
+        # Process(target=followee_url_process, args=(uid_with_trash_queue, True, followee_lock, shutdown, localShutdown,)),
+        Process(target=follower_url_process, args=(uid_with_trash_queue, True, followee_lock, shutdown, localShutdown,)),
         Process(target=followee_url_process, args=(uid_with_trash_queue, False, follower_lock, shutdown, localShutdown,))]
     start_process(process)
 

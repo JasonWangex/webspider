@@ -20,7 +20,7 @@ def get_content(url):
         header = config.header
         header['Cookie'] = cookie.cookie
         header['X-Xsrftoken'] = cookie.xsrf
-        resp = requests.get(url, headers=config.header)
+        resp = requests.get(url, headers=config.header, verify=False)
     except SSLError:
         return u""
     return resp.content
@@ -42,7 +42,7 @@ def get_followers(hash_id, page, url='ProfileFollowersListV2'):
         header = config.header
         header['Cookie'] = cookie.cookie
         header['X-Xsrftoken'] = cookie.xsrf
-        resp = requests.post("https://www.zhihu.com/node/" + url, data=data, headers=header)
+        resp = requests.post("https://www.zhihu.com/node/" + url, data=data, headers=header, verify=False)
         return resp.content
     except SSLError:
         return u""
