@@ -32,11 +32,13 @@ def download_process(uid_queue, shutdown, localShutdown):
     while not (shutdown.get() or localShutdown.value):
         if failedCount > 5:
             print '/////////下载失败！/////////'
-            time.sleep(5)
-            print '>>>>>> 正在尝试重启....'
             time.sleep(1)
+            print '>>>>>> 正在尝试重启....'
+            time.sleep(10)
             cookie = persistence.cookies_dao.get_one_with_lock()
-            break
+            if cookie is None:
+                print '/////////无可用cookie！/////////'
+                return
         uid = uid_queue.get(timeout=15)
         url = resolver.get_url_by_uid(uid)
         content = download.get_content(url, cookie.cookie, cookie.xsrf)
