@@ -18,8 +18,11 @@ def get_content2(url):
     return rtn.read()
 
 
-def get_content(url):
+def get_content(url, cookie, xsrf):
     try:
+        header = config.header
+        header['Cookie'] = cookie
+        header['X-Xsrftoken'] = xsrf
         resp = requests.get(url, headers=config.header)
     except SSLError:
         return u""

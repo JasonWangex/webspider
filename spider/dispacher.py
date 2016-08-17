@@ -11,9 +11,8 @@ import threading
 from Domain import Failed
 from persistence import user_dao
 from persistence import failed_dao
-from multiprocessing import Process
+from multiprocessing import Process, Lock
 from multiprocessing import Queue
-
 import persistence
 
 try:
@@ -26,13 +25,21 @@ failedCount = 0
 
 def download_process(uid_queue, shutdown, localShutdown):
     global failedCount
+    cookie = persistence.cookies_dao.get_one_with_lock()
+    if cookie is None:
+        print '/////////无可用cookie！/////////'
+        return
     while not (shutdown.get() or localShutdown.value):
         if failedCount > 5:
-            print '//////////Download failed!!!//////////'
+            print '/////////下载失败！/////////'
+            time.sleep(5)
+            print '>>>>>> 正在尝试重启....'
+            time.sleep(1)
+            cookie = persistence.cookies_dao.get_one_with_lock()
             break
         uid = uid_queue.get(timeout=15)
         url = resolver.get_url_by_uid(uid)
-        content = download.get_content(url)
+        content = download.get_content(url, cookie.cookie, cookie.xsrf)
         threading.Thread(target=resolve_thread, args=(content,)).start()
 
 
@@ -135,11 +142,13 @@ def start_process(procs):
 
 
 def daemon_process(procs, shutdown, localShutdown):
-    while not (shutdown or localShutdown.value):
+    while not (shutdown.get() or localShutdown.value):
         for proc in procs:
             if not proc.is_alive():
+                procs.remove(proc)
                 new_proc = Process(target=proc._target, args=proc._args)
                 new_proc.start()
+                procs.append(new_proc)
         time.sleep(5)
 
 
@@ -191,10 +200,14 @@ def start_master(port):
     uid_queue = Queue(200)
     uid_with_trash_queue = Queue(500)
     shutdown = Value('i', False)
+    followee_url_lock = Lock()
+    follower_url_lock = Lock()
 
     QueueManager.register('get_uid_queue', callable=lambda: uid_queue)
     QueueManager.register('get_uid_with_trash_queue', callable=lambda: uid_with_trash_queue)
     QueueManager.register('get_shutdown', callable=lambda: shutdown)
+    QueueManager.register('get_followee_url_lock', callable=lambda: followee_url_lock)
+    QueueManager.register('get_follower_url_lock', callable=lambda: follower_url_lock)
 
     manager = QueueManager(address=('', port), authkey=config.auth_key)
     manager.start()
@@ -267,10 +280,7 @@ def start_download(address, port, localShutdown):
     for i in range(2):
         process.append(Process(target=download_process, args=(uid_queue, shutdown, localShutdown,)))
     start_process(process)
-    daemon_proc = Process(target=daemon_process, args=(process, shutdown, localShutdown,))
-    daemon_proc.start()
     local_shutdown_listener(localShutdown)
-    daemon_proc.join()
 
 
 def start_url_resolver(address, port, localShutdown):
@@ -291,7 +301,4 @@ def start_url_resolver(address, port, localShutdown):
     process.append(Process(target=follower_url_process, args=(uid_with_trash_queue, shutdown, localShutdown,)))
     start_process(process)
 
-    daemon_proc = Process(target=daemon_process, args=(process, shutdown, localShutdown,))
-    daemon_proc.start()
     local_shutdown_listener(localShutdown)
-    daemon_proc.join()
