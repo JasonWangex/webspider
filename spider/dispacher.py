@@ -43,6 +43,7 @@ def download_process(uid_queue, shutdown, localShutdown):
         url = resolver.get_url_by_uid(uid)
         content = download.get_content(url, cookie.cookie, cookie.xsrf)
         threading.Thread(target=resolve_thread, args=(content,)).start()
+    persistence.cookies_dao.release_lock(cookie)
 
 
 def resolve_thread(content):
@@ -73,7 +74,7 @@ def followee_url_process(uid_with_trash_queue, followee_lock, shutdown, localShu
             with followee_lock:
                 current_user.getFollowees += 1
                 user_dao.save_or_update(current_user)
-            time.sleep(0.01)# 10ms for other process getting lock
+            time.sleep(0.01)  # 10ms for other process getting lock
             print ">>>>> URL下载成功 - Followee ", current_user.getFollowees
             uids = resolver.resolve_for_uids(msg)
             for uid in uids:
@@ -99,8 +100,12 @@ def follower_url_process(uid_with_trash_queue, follower_lock, shutdown, localShu
         max_follower_page = 0 if current_user.followers == 0 else current_user.followers / 20 + 1
         while current_user.getFollowers < max_follower_page and not (shutdown.get() or localShutdown.value):
             msg = download.get_followers(hash_id=current_user.hashId, page=current_user.getFollowers)
-            current_user.getFollowers += 1
-            user_dao.save_or_update(current_user)
+
+            with follower_lock:
+                current_user.getFollowers += 1
+                user_dao.save_or_update(current_user)
+            time.sleep(0.01)
+
             print ">>>>> URL下载成功 - Follower ", current_user.getFollowers
             uids = resolver.resolve_for_uids(msg)
             for uid in uids:
@@ -303,9 +308,9 @@ def start_url_resolver(address, port, localShutdown):
     followee_lock = manager.get_followee_url_lock()
     follower_lock = manager.get_follower_url_lock()
 
-    process = []
-    process.append(Process(target=followee_url_process, args=(uid_with_trash_queue, followee_lock, shutdown, localShutdown,)))
-    process.append(Process(target=follower_url_process, args=(uid_with_trash_queue, follower_lock, shutdown, localShutdown,)))
+    process = [
+        Process(target=followee_url_process, args=(uid_with_trash_queue, followee_lock, shutdown, localShutdown,)),
+        Process(target=follower_url_process, args=(uid_with_trash_queue, follower_lock, shutdown, localShutdown,))]
     start_process(process)
 
     local_shutdown_listener(localShutdown)
