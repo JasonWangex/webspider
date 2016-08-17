@@ -230,8 +230,8 @@ class QueueManager(BaseManager):
 
 def start_master(port):
     all_uid_list = []
-    uid_queue = Queue(200)
-    uid_with_trash_queue = Queue(500)
+    uid_queue = Queue(800)
+    uid_with_trash_queue = Queue(1500)
     shutdown = Value('i', False)
     followee_url_lock = Lock()
     follower_url_lock = Lock()
@@ -294,6 +294,10 @@ def start_master(port):
     report_thread.join()
     # 关闭服务
     before_shut_down(all_uid_list, uid_queue, uid_with_trash_queue)
+    print '>>>>>>> 系统将在 20 秒后关闭<<<<<<<'
+    for i in range(20, 1, -1):
+        print ">>>>>>> 系统将在 ", i, " 秒后关闭<<<<<<<"
+        time.sleep(1)
     manager.shutdown()
 
 
