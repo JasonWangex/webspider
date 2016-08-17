@@ -4,56 +4,63 @@ from requests.exceptions import SSLError
 import config
 import json
 from Domain import Cookies
-from persistence import cookies_dao
+from cookies import cookies_dao
+
+cookie = Cookies()
 
 
-class Download(object):
-    cookie = Cookies()
+def start_download():
+    global cookie
+    cookie = cookies_dao.get_one_with_lock()
 
-    def __init__(self):
-        self.cookie = cookies_dao.get_one_with_lock()
-        pass
 
-    def get_content(self, url):
-        try:
-            header = config.header
-            header['Cookie'] = self.cookie.cookie
-            header['X-Xsrftoken'] = self.cookie.xsrf
-            resp = requests.get(url, headers=config.header, verify=False)
-        except SSLError:
-            return u""
+def get_content(url):
+    global cookie
+    try:
+        header = config.header
+        header['Cookie'] = cookie.cookie
+        header['X-Xsrftoken'] = cookie.xsrf
+        resp = requests.get(url, headers=config.header)
+    except SSLError:
+        return u""
+    return resp.content
+
+
+def get_followers(hash_id, page, url='ProfileFollowersListV2'):
+    global cookie
+    params = {
+        'offset': page * 20,
+        'hash_id': hash_id,
+        'order_by': 'created'
+    }
+
+    data = {
+        "method": "next",
+        "params": json.dumps(params)
+    }
+    try:
+        header = config.header
+        header['Cookie'] = cookie.cookie
+        header['X-Xsrftoken'] = cookie.xsrf
+        resp = requests.post("https://www.zhihu.com/node/" + url, data=data, headers=header)
         return resp.content
+    except SSLError:
+        return u""
 
-    def get_followers(self, hash_id, page, url='ProfileFollowersListV2'):
-        params = {
-            'offset': page * 20,
-            'hash_id': hash_id,
-            'order_by': 'created'
-        }
 
-        data = {
-            "method": "next",
-            "params": json.dumps(params)
-        }
-        try:
-            header = config.header
-            header['Cookie'] = self.cookie.cookie
-            header['X-Xsrftoken'] = self.cookie.xsrf
-            resp = requests.post("https://www.zhihu.com/node/" + url, data=data, headers=header, verify=False)
-            return resp.content
-        except SSLError:
-            return u""
+def get_followees(hash_id, page):
+    return get_followers(hash_id=hash_id, page=page, url='ProfileFolloweesListV2')
 
-    def get_followees(self, hash_id, page):
-        return self.get_followers(hash_id=hash_id, page=page, url='ProfileFolloweesListV2')
 
-    def shut_down(self):
-        cookies_dao.release_lock(self.cookie)
+def shut_down():
+    global cookie
+    cookies_dao.release_lock(cookie)
 
-    def restart(self):
-        self.cookie = cookies_dao.get_one_with_lock()
-        if self.cookie is not None:
-            return True
-        else:
-            return False
 
+def restart():
+    global cookie
+    cookie = cookies_dao.get_one_with_lock()
+    if cookie is not None:
+        return True
+    else:
+        return False

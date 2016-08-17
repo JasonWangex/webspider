@@ -6,14 +6,15 @@ from multiprocessing.managers import BaseManager, Value
 
 import config
 import resolver
+import download
 import threading
 from Domain import Failed
-from download import Download
 from persistence import user_dao
 from persistence import failed_dao
 from multiprocessing import Process, Lock
 from multiprocessing import Queue
 import persistence
+import cookies
 
 try:
     import cPickle as pickle
@@ -24,7 +25,7 @@ failedCount = 0
 download_lock = Lock()
 
 
-def download_process(uid_queue, download, operator, shutdown, localShutdown):
+def download_process(uid_queue, operator, shutdown, localShutdown):
     global failedCount
     while not (shutdown.get() or localShutdown.value):
         if failedCount > 5:
@@ -43,6 +44,8 @@ def download_process(uid_queue, download, operator, shutdown, localShutdown):
         url = resolver.get_url_by_uid(uid)
         content = download.get_content(url)
         threading.Thread(target=resolve_thread, args=(content,)).start()
+    if operator:
+        download.shut_down()
 
 
 def resolve_thread(content):
@@ -60,7 +63,7 @@ def resolve_thread(content):
         failedCount += 1
 
 
-def followee_url_process(uid_with_trash_queue, download, operator, followee_lock, shutdown, localShutdown):
+def followee_url_process(uid_with_trash_queue, operator, followee_lock, shutdown, localShutdown):
     global failedCount
     while not (shutdown.get() or localShutdown.value):
         current_user = user_dao.get_user_for_followees()
@@ -80,10 +83,13 @@ def followee_url_process(uid_with_trash_queue, download, operator, followee_lock
                     break
             msg = download.get_followees(hash_id=current_user.hashId, page=current_user.getFollowees)
 
-            with followee_lock:
+            try:
+                followee_lock._callmethod(methodname='acquire')
                 current_user.getFollowees += 1
                 user_dao.save_or_update(current_user)
-            time.sleep(0.01)  # 10ms for other process getting lock
+            finally:
+                followee_lock._callmethod(methodname='release')
+
             print ">>>>> URL下载成功 - Followee ", current_user.getFollowees
             uids = resolver.resolve_for_uids(msg)
             if len(uids) == 0:
@@ -100,9 +106,11 @@ def followee_url_process(uid_with_trash_queue, download, operator, followee_lock
         current_user.needGetFollowees = False
         current_user.getFollowees = max_followee_page
         user_dao.save_or_update(current_user)
+    if operator:
+        download.shut_down()
 
 
-def follower_url_process(uid_with_trash_queue, download, operator, follower_lock, shutdown, localShutdown):
+def follower_url_process(uid_with_trash_queue, operator, follower_lock, shutdown, localShutdown):
     global failedCount
     while not (shutdown.get() or localShutdown.value):
         current_user = user_dao.get_user_for_followers()
@@ -112,22 +120,21 @@ def follower_url_process(uid_with_trash_queue, download, operator, follower_lock
         max_follower_page = 0 if current_user.followers == 0 else current_user.followers / 20 + 1
         while current_user.getFollowers < max_follower_page and not (shutdown.get() or localShutdown.value):
             if failedCount > 5 and operator:
-                if failedCount > 5:
-                    print '///////URL 被封禁///////'
-                    time.sleep(1)
-                    print '>>>>>> 正在尝试重启...'
-                    time.sleep(10)
-                    if not download.restart():
-                        print '/////////重启失败！/////////'
-                        localShutdown.value = True
-                        break
+                print '///////URL 被封禁///////'
+                time.sleep(1)
+                print '>>>>>> 正在尝试重启...'
+                time.sleep(10)
+                if not download.restart():
+                    print '/////////重启失败！/////////'
+                    localShutdown.value = True
+                    break
 
             msg = download.get_followers(hash_id=current_user.hashId, page=current_user.getFollowers)
 
             try:
-                if follower_lock._callmethod(methodname='acquire'):
-                    current_user.getFollowers += 1
-                    user_dao.save_or_update(current_user)
+                follower_lock._callmethod(methodname='acquire')
+                current_user.getFollowers += 1
+                user_dao.save_or_update(current_user)
             finally:
                 follower_lock._callmethod(methodname='release')
 
@@ -145,6 +152,8 @@ def follower_url_process(uid_with_trash_queue, download, operator, follower_lock
         current_user.needGetFollowers = False
         current_user.getFollowers = max_follower_page
         user_dao.save_or_update(current_user)
+    if operator:
+        download.shut_down()
 
 
 def report(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
@@ -174,17 +183,6 @@ def local_shutdown_listener(localShutdown):
 def start_process(procs):
     for proc in procs:
         proc.start()
-
-
-def daemon_process(procs, shutdown, localShutdown):
-    while not (shutdown.get() or localShutdown.value):
-        for proc in procs:
-            if not proc.is_alive():
-                procs.remove(proc)
-                new_proc = Process(target=proc._target, args=proc._args)
-                new_proc.start()
-                procs.append(new_proc)
-        time.sleep(5)
 
 
 def clean_uid(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
@@ -302,6 +300,7 @@ def start_master(port):
 def start_download(address, port, localShutdown):
     print '/////// 系统启动 - 下载节点 ///////'
     persistence.start_session()
+    cookies.start_session()
     QueueManager.register('get_uid_queue')
     QueueManager.register('get_shutdown')
 
@@ -312,16 +311,17 @@ def start_download(address, port, localShutdown):
     shutdown = manager.get_shutdown()
 
     process = []
-    download = Download()
-    process.append(Process(target=download_process, args=(uid_queue, download, True, shutdown, localShutdown,)))
+    download.start_download()
+    process.append(Process(target=download_process, args=(uid_queue, True, shutdown, localShutdown,)))
     for i in range(1):
-        process.append(Process(target=download_process, args=(uid_queue, download, False, shutdown, localShutdown,)))
+        process.append(Process(target=download_process, args=(uid_queue, False, shutdown, localShutdown,)))
     start_process(process)
     local_shutdown_listener(localShutdown)
 
 
 def start_url_resolver(address, port, localShutdown):
     persistence.start_session()
+    cookies.start_session()
     print '/////// 系统启动 - RUL节点 ///////'
 
     QueueManager.register('get_uid_with_trash_queue')
@@ -332,17 +332,17 @@ def start_url_resolver(address, port, localShutdown):
     manager = QueueManager(address=(address, port), authkey=config.auth_key)
     manager.connect()
 
-    download = Download()
+    download.start_download()
 
     uid_with_trash_queue = manager.get_uid_with_trash_queue()
     shutdown = manager.get_shutdown()
-    # followee_lock = manager.get_followee_url_lock()
+    followee_lock = manager.get_followee_url_lock()
     follower_lock = manager.get_follower_url_lock()
 
     process = [
-        # Process(target=followee_url_process, args=(uid_with_trash_queue, download, operator, followee_lock, shutdown, localShutdown,)),
-        Process(target=follower_url_process, args=(uid_with_trash_queue, download, True, follower_lock, shutdown, localShutdown,)),
-        Process(target=follower_url_process, args=(uid_with_trash_queue, download, False, follower_lock, shutdown, localShutdown,))]
+        Process(target=followee_url_process, args=(uid_with_trash_queue, True, followee_lock, shutdown, localShutdown,)),
+        # Process(target=follower_url_process, args=(uid_with_trash_queue, True, followee_lock, shutdown, localShutdown,)),
+        Process(target=followee_url_process, args=(uid_with_trash_queue, False, follower_lock, shutdown, localShutdown,))]
     start_process(process)
 
     local_shutdown_listener(localShutdown)
