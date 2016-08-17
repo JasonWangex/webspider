@@ -40,6 +40,8 @@ def download_process(uid_queue, operator, shutdown, localShutdown):
                     break
             else:
                 time.sleep(10)
+                failedCount = 0
+
         uid = uid_queue.get(timeout=15)
         url = resolver.get_url_by_uid(uid)
         content = download.get_content(url)
@@ -81,6 +83,9 @@ def followee_url_process(uid_with_trash_queue, operator, followee_lock, shutdown
                     print '/////////重启失败！/////////'
                     localShutdown.value = True
                     break
+                else:
+                    failedCount = 0
+
             msg = download.get_followees(hash_id=current_user.hashId, page=current_user.getFollowees)
 
             try:
