@@ -39,8 +39,8 @@ def download_process(uid_queue, operator, shutdown, localShutdown):
                     localShutdown.value = True
                     break
             else:
-                time.sleep(10)
                 failedCount = 0
+                time.sleep(10)
 
         uid = uid_queue.get(timeout=15)
         url = resolver.get_url_by_uid(uid)
@@ -78,13 +78,13 @@ def followee_url_process(uid_with_trash_queue, operator, followee_lock, shutdown
                 print '///////URL 被封禁///////'
                 time.sleep(1)
                 print '>>>>>> 正在尝试重启...'
-                time.sleep(10)
                 if not download.restart():
                     print '/////////重启失败！/////////'
                     localShutdown.value = True
                     break
                 else:
                     failedCount = 0
+                    time.sleep(10)
 
             msg = download.get_followees(hash_id=current_user.hashId, page=current_user.getFollowees)
 
@@ -99,6 +99,9 @@ def followee_url_process(uid_with_trash_queue, operator, followee_lock, shutdown
             uids = resolver.resolve_for_uids(msg)
             if len(uids) == 0:
                 failedCount += 1
+            else:
+                failedCount = 0
+
             for uid in uids:
                 try:
                     uid_with_trash_queue.put(uid, timeout=10)
@@ -128,11 +131,13 @@ def follower_url_process(uid_with_trash_queue, operator, follower_lock, shutdown
                 print '///////URL 被封禁///////'
                 time.sleep(1)
                 print '>>>>>> 正在尝试重启...'
-                time.sleep(10)
                 if not download.restart():
                     print '/////////重启失败！/////////'
                     localShutdown.value = True
                     break
+                else:
+                    failedCount = 0
+                    time.sleep(10)
 
             msg = download.get_followers(hash_id=current_user.hashId, page=current_user.getFollowers)
 
