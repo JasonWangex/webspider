@@ -3,8 +3,9 @@ import sys
 
 # spider begin
 # command is
-#         type(m master,d only download,u only url resolver)
-#         port(integer)
+#         type      (m master, d download, u url resolver)
+#         address   (master ip, if master : 0)
+#         port      (master port)
 from multiprocessing import Value
 
 import dispacher

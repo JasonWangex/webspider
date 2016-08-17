@@ -58,7 +58,7 @@ def resolve_thread(content):
         failedCount += 1
 
 
-def followee_url_process(uid_with_trash_queue, shutdown, localShutdown):
+def followee_url_process(uid_with_trash_queue, followee_lock, shutdown, localShutdown):
     while not (shutdown.get() or localShutdown.value):
         current_user = user_dao.get_user_for_followees()
         if current_user is None:
@@ -67,7 +67,11 @@ def followee_url_process(uid_with_trash_queue, shutdown, localShutdown):
         max_followee_page = 0 if current_user.followees == 0 else current_user.followees / 20 + 1
         while current_user.getFollowees < max_followee_page and not (shutdown.get() or localShutdown.value):
             msg = download.get_followees(hash_id=current_user.hashId, page=current_user.getFollowees)
-            current_user.getFollowees += 1
+
+            with followee_lock:
+                current_user.getFollowees += 1
+                user_dao.save_or_update(current_user)
+            time.sleep(0.01)# 10ms for other process getting lock
             print ">>>>> URL下载成功 - Followee ", current_user.getFollowees
             uids = resolver.resolve_for_uids(msg)
             for uid in uids:
@@ -79,13 +83,12 @@ def followee_url_process(uid_with_trash_queue, shutdown, localShutdown):
                     else:
                         print ">>>>>", uid, "is lost!"
                         continue
-            user_dao.save_or_update(current_user)
         current_user.needGetFollowees = False
         current_user.getFollowees = max_followee_page
         user_dao.save_or_update(current_user)
 
 
-def follower_url_process(uid_with_trash_queue, shutdown, localShutdown):
+def follower_url_process(uid_with_trash_queue, follower_lock, shutdown, localShutdown):
     while not (shutdown.get() or localShutdown.value):
         current_user = user_dao.get_user_for_followers()
         if current_user is None:
@@ -95,6 +98,7 @@ def follower_url_process(uid_with_trash_queue, shutdown, localShutdown):
         while current_user.getFollowers < max_follower_page and not (shutdown.get() or localShutdown.value):
             msg = download.get_followers(hash_id=current_user.hashId, page=current_user.getFollowers)
             current_user.getFollowers += 1
+            user_dao.save_or_update(current_user)
             print ">>>>> URL下载成功 - Follower ", current_user.getFollowers
             uids = resolver.resolve_for_uids(msg)
             for uid in uids:
@@ -106,7 +110,6 @@ def follower_url_process(uid_with_trash_queue, shutdown, localShutdown):
                     else:
                         print ">>>>>", uid, "is lost!"
                         continue
-            user_dao.save_or_update(current_user)
         current_user.needGetFollowers = False
         current_user.getFollowers = max_follower_page
         user_dao.save_or_update(current_user)
@@ -295,10 +298,12 @@ def start_url_resolver(address, port, localShutdown):
 
     uid_with_trash_queue = manager.get_uid_with_trash_queue()
     shutdown = manager.get_shutdown()
+    followee_lock = manager.get_followee_url_lock()
+    follower_lock = manager.get_follower_url_lock()
 
     process = []
-    process.append(Process(target=followee_url_process, args=(uid_with_trash_queue, shutdown, localShutdown,)))
-    process.append(Process(target=follower_url_process, args=(uid_with_trash_queue, shutdown, localShutdown,)))
+    process.append(Process(target=followee_url_process, args=(uid_with_trash_queue, followee_lock, shutdown, localShutdown,)))
+    process.append(Process(target=follower_url_process, args=(uid_with_trash_queue, follower_lock, shutdown, localShutdown,)))
     start_process(process)
 
     local_shutdown_listener(localShutdown)
