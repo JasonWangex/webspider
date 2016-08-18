@@ -7,14 +7,14 @@ from multiprocessing.managers import BaseManager, Value
 import config
 import resolver
 import download
+import user_dao
+import failed_dao
 import threading
 from Domain import Failed, User
-from persistence import user_dao
-from persistence import failed_dao
 from multiprocessing import Process, Lock
 from multiprocessing import Queue
-import persistence
-import cookies
+
+import cookies_dao
 
 try:
     import cPickle as pickle
@@ -91,7 +91,7 @@ def followee_url_process(uid_with_trash_queue, user_waiting_resolve_url_queue, o
                         if not download.restart():
                             print '/////////重启失败！/////////'
                             localShutdown.value = True
-                            break
+                            return
                         else:
                             failedCount = 0
                             time.sleep(10)
@@ -102,7 +102,6 @@ def followee_url_process(uid_with_trash_queue, user_waiting_resolve_url_queue, o
 
             msg = download.get_followees(hash_id=current_user.hashId, page=current_user.getFollowees)
             current_user.getFollowees += 1
-            user_dao.save_or_update(current_user)
             print ">>>>> URL下载成功 - Followee ", current_user.getFollowees
             uids = resolver.resolve_for_uids(msg)
             if len(uids) == 0:
@@ -121,6 +120,7 @@ def followee_url_process(uid_with_trash_queue, user_waiting_resolve_url_queue, o
                     else:
                         print ">>>>>", uid, "is lost!"
                         continue
+            user_dao.save_or_update(current_user)
         current_user.needGetFollowees = False
         current_user.getFollowees = max_followee_page
         user_dao.save_or_update(current_user)
@@ -169,7 +169,6 @@ def follower_url_process(uid_with_trash_queue, operator, shutdown, localShutdown
 
 
 def fill_user_queue_process(user_waiting_resolve_url_queue, shutdown):
-    persistence.start_session()
     current_user = User()
     while not shutdown.get():
         current_user = user_dao.get_next_user(current_user)
@@ -257,9 +256,9 @@ class QueueManager(BaseManager):
 
 def start_master(port):
     all_uid_list = []
-    uid_queue = Queue(800)
-    uid_with_trash_queue = Queue(1500)
-    user_waiting_resolve_url_queue = Queue(500)
+    uid_queue = Queue(1000)
+    uid_with_trash_queue = Queue(5000)
+    user_waiting_resolve_url_queue = Queue(200)
 
     shutdown = Value('i', False)
 
@@ -287,7 +286,7 @@ def start_master(port):
     clean_thread = threading.Thread(target=clean_uid, args=(uid_queue, uid_with_trash_queue, all_uid_list, shutdown))
     clean_thread.start()
     report_thread = threading.Thread(target=report, args=(
-    uid_queue, uid_with_trash_queue, all_uid_list, user_waiting_resolve_url_queue, shutdown))
+        uid_queue, uid_with_trash_queue, all_uid_list, user_waiting_resolve_url_queue, shutdown))
     report_thread.start()
     fill_user_queue = Process(target=fill_user_queue_process, args=(user_waiting_resolve_url_queue, shutdown))
     fill_user_queue.start()
@@ -333,8 +332,6 @@ def start_master(port):
 
 def start_download(address, port, localShutdown):
     print '/////// 系统启动 - 下载节点 ///////'
-    persistence.start_session()
-    cookies.start_session()
     QueueManager.register('get_uid_queue')
     QueueManager.register('get_shutdown')
 
@@ -353,8 +350,6 @@ def start_download(address, port, localShutdown):
 
 
 def start_url_resolver(address, port, localShutdown):
-    persistence.start_session()
-    cookies.start_session()
     print '/////// 系统启动 - RUL节点 ///////'
 
     QueueManager.register('get_uid_with_trash_queue')

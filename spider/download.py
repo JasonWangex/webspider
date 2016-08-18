@@ -3,10 +3,9 @@ import requests
 from requests.exceptions import RequestException
 import config
 import json
-from Domain import Cookies
-from cookies import cookies_dao
+import cookies_dao
 
-cookie = Cookies()
+cookie = None
 
 
 def start_download():
