@@ -68,11 +68,29 @@ class user_dao(object):
             session.close()
 
     @staticmethod
-    def get_user_for_followees():
+    def get_user_for_followees(user_id=0):
         global DBSession
         session = DBSession()
         try:
-            user = session.query(User).filter(User.needGetFollowees == True).first()
+            if user_id == 0:
+                user = session.query(User).filter(User.needGetFollowees == True).first()
+            else:
+                user = session.query(User).filter(User.id == user_id).first()
+            return user
+        except NoResultFound:
+            pass
+        finally:
+            session.close()
+
+    @staticmethod
+    def get_next_user(user=User()):
+        global DBSession
+        session = DBSession()
+        try:
+            if user.id is None:
+                user = session.query(User).filter(User.needGetFollowees == True).first()
+            else:
+                user = session.query(User).filter(User.id == user.id + 1).first()
             return user
         except NoResultFound:
             pass

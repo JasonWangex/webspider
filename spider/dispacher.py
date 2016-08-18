@@ -8,7 +8,7 @@ import config
 import resolver
 import download
 import threading
-from Domain import Failed
+from Domain import Failed, User
 from persistence import user_dao
 from persistence import failed_dao
 from multiprocessing import Process, Lock
@@ -68,10 +68,11 @@ def resolve_thread(content):
         failedCount += 1
 
 
-def followee_url_process(uid_with_trash_queue, operator, shutdown, localShutdown):
+def followee_url_process(uid_with_trash_queue, user_waiting_resolve_url_queue, operator, shutdown, localShutdown):
     global failedCount
     while not (shutdown.get() or localShutdown.value):
-        current_user = user_dao.get_user_for_followees()
+        user_id = user_waiting_resolve_url_queue.get()
+        current_user = user_dao.get_user_for_followees(user_id=user_id)
         if current_user is None:
             continue
 
@@ -120,7 +121,7 @@ def followee_url_process(uid_with_trash_queue, operator, shutdown, localShutdown
         download.shut_down()
 
 
-def follower_url_process(uid_with_trash_queue, operator, follower_lock, shutdown, localShutdown):
+def follower_url_process(uid_with_trash_queue, operator, shutdown, localShutdown):
     global failedCount
     while not (shutdown.get() or localShutdown.value):
         current_user = user_dao.get_user_for_followers()
@@ -164,7 +165,21 @@ def follower_url_process(uid_with_trash_queue, operator, follower_lock, shutdown
         download.shut_down()
 
 
-def report(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
+def fill_user_queue_process(user_waiting_resolve_url_queue, shutdown):
+    persistence.start_session()
+    current_user = User()
+    while not shutdown.get():
+        current_user = user_dao.get_next_user(current_user)
+        time.sleep(0.01)
+        try:
+            if current_user is not None:
+                user_waiting_resolve_url_queue.put(current_user.id, timeout=5)
+        except Full:
+            current_user.id -= 1
+            continue
+
+
+def report(uid_queue, uid_with_trash_queue, all_uid_list, user_waiting_resolve_url_queue, shutdown):
     while not shutdown.get():
         time.sleep(10)
         if shutdown.get():
@@ -173,6 +188,7 @@ def report(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
         print ">>>> 待解析 uid 列表: ", uid_queue.qsize()
         print ">>>> 待清洗 uid 列表: ", uid_with_trash_queue.qsize()
         print ">>>> 总解析 uid 列表: ", len(all_uid_list)
+        print ">>>> 总解析  id 列表: ", user_waiting_resolve_url_queue.qsize()
         print "////////////数据报告////////////\n"
 
 
@@ -240,15 +256,14 @@ def start_master(port):
     all_uid_list = []
     uid_queue = Queue(800)
     uid_with_trash_queue = Queue(1500)
+    user_waiting_resolve_url_queue = Queue(500)
+
     shutdown = Value('i', False)
-    followee_url_lock = Lock()
-    follower_url_lock = Lock()
 
     QueueManager.register('get_uid_queue', callable=lambda: uid_queue)
     QueueManager.register('get_uid_with_trash_queue', callable=lambda: uid_with_trash_queue)
     QueueManager.register('get_shutdown', callable=lambda: shutdown)
-    QueueManager.register('get_followee_url_lock', callable=lambda: followee_url_lock)
-    QueueManager.register('get_follower_url_lock', callable=lambda: follower_url_lock)
+    QueueManager.register('get_user_waiting_resolve_url_queue', callable=lambda: user_waiting_resolve_url_queue)
 
     manager = QueueManager(address=('', port), authkey=config.auth_key)
     manager.start()
@@ -256,6 +271,7 @@ def start_master(port):
     uid_queue = manager.get_uid_queue()
     uid_with_trash_queue = manager.get_uid_with_trash_queue()
     shutdown = manager.get_shutdown()
+    user_waiting_resolve_url_queue = manager.get_user_waiting_resolve_url_queue()
 
     print '/////// 系统启动 - 主节点 ///////'
 
@@ -267,8 +283,11 @@ def start_master(port):
 
     clean_thread = threading.Thread(target=clean_uid, args=(uid_queue, uid_with_trash_queue, all_uid_list, shutdown))
     clean_thread.start()
-    report_thread = threading.Thread(target=report, args=(uid_queue, uid_with_trash_queue, all_uid_list, shutdown))
+    report_thread = threading.Thread(target=report, args=(
+    uid_queue, uid_with_trash_queue, all_uid_list, user_waiting_resolve_url_queue, shutdown))
     report_thread.start()
+    fill_user_queue = Process(target=fill_user_queue_process, args=(user_waiting_resolve_url_queue, shutdown))
+    fill_user_queue.start()
 
     with open('uid_queue', 'rb') as f_uid_queue:
         if f_uid_queue.readline() != "":
@@ -338,8 +357,7 @@ def start_url_resolver(address, port, localShutdown):
 
     QueueManager.register('get_uid_with_trash_queue')
     QueueManager.register('get_shutdown')
-    QueueManager.register('get_followee_url_lock')
-    QueueManager.register('get_follower_url_lock')
+    QueueManager.register('get_user_waiting_resolve_url_queue')
 
     manager = QueueManager(address=(address, port), authkey=config.auth_key)
     manager.connect()
@@ -348,12 +366,13 @@ def start_url_resolver(address, port, localShutdown):
 
     uid_with_trash_queue = manager.get_uid_with_trash_queue()
     shutdown = manager.get_shutdown()
-    # follower_lock = manager.get_follower_url_lock()
+    user_waiting_resolve_url_queue = manager.get_user_waiting_resolve_url_queue()
 
     process = [
         # Process(target=followee_url_process, args=(uid_with_trash_queue, True, followee_lock, shutdown, localShutdown,)),
         # Process(target=follower_url_process, args=(uid_with_trash_queue, True, follower_lock, shutdown, localShutdown,)),
-        Process(target=followee_url_process, args=(uid_with_trash_queue, True, shutdown, localShutdown,))]
+        Process(target=followee_url_process,
+                args=(uid_with_trash_queue, user_waiting_resolve_url_queue, True, shutdown, localShutdown,))]
     start_process(process)
 
     local_shutdown_listener(localShutdown)
