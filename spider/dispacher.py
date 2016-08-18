@@ -55,8 +55,6 @@ def download_process(uid_queue, operator, shutdown, localShutdown):
         url = resolver.get_url_by_uid(uid)
         content = download.get_content(url)
         threading.Thread(target=resolve_thread, args=(content,)).start()
-    if operator:
-        download.shut_down()
 
 
 def resolve_thread(content):
@@ -126,8 +124,6 @@ def followee_url_process(uid_with_trash_queue, user_waiting_resolve_url_queue, o
         current_user.needGetFollowees = False
         current_user.getFollowees = max_followee_page
         user_dao.save_or_update(current_user)
-    if operator:
-        download.shut_down()
 
 
 def follower_url_process(uid_with_trash_queue, operator, shutdown, localShutdown):
@@ -170,8 +166,6 @@ def follower_url_process(uid_with_trash_queue, operator, shutdown, localShutdown
         current_user.needGetFollowers = False
         current_user.getFollowers = max_follower_page
         user_dao.save_or_update(current_user)
-    if operator:
-        download.shut_down()
 
 
 def fill_user_queue_process(user_waiting_resolve_url_queue, shutdown):
