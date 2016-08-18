@@ -105,15 +105,20 @@ def resolve_for_uids(response):
         response = json.JSONDecoder().decode(response)
         msg = response['msg']
         for item in msg:
-            urls.append(resolve_for_uid(item))
+            url = resolve_for_uid(item)
+            if url is not None:
+                urls.append(url)
     except ValueError:
         pass
     return urls
 
 
 def resolve_for_uid(html):
-    soup = BeautifulSoup(html, "html.parser")
-    uid = soup.find('a', class_='zm-item-link-avatar').get('href').replace('/people/', '')
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+        uid = soup.find('a', class_='zm-item-link-avatar').get('href').replace('/people/', '')
+    except AttributeError:
+        uid = None
     return uid
 
 
