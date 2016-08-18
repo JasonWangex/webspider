@@ -49,7 +49,7 @@ def get_followers(hash_id, page, url='ProfileFollowersListV2'):
         header = config.header
         header['Cookie'] = cookieWrapper.value.cookie
         header['X-Xsrftoken'] = cookieWrapper.value.xsrf
-        resp = requests.post("https://www.zhihu.com/node/" + url, data=data, headers=header)
+        resp = requests.post("https://www.zhihu.com/node/" + url, data=data, headers=header, verify=False)
         return resp.content
     except RequestException:
         print "/////////RequestException!/////////"
