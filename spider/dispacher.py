@@ -32,16 +32,22 @@ def download_process(uid_queue, operator, shutdown, localShutdown):
             print '/////////下载被封禁！/////////'
             time.sleep(1)
             print '>>>>>> 正在尝试重启....'
-            time.sleep(10)
-            if operator:
-                if not download.restart():
-                    print '/////////重启失败！/////////'
-                    localShutdown.value = True
-                    break
-            else:
-                failedCount = 0
-                time.sleep(10)
 
+            while failedCount > 5:
+                if operator:
+                    print '>>>>>> 正在尝试重启...'
+                    if not download.restart():
+                        print '/////////重启失败！/////////'
+                        localShutdown.value = True
+                        break
+                    else:
+                        print '>>>>>> 重启成功....'
+                        time.sleep(5)
+                        failedCount = 0
+                else:
+                    print '>>>>>> 正在等待主线程重启...'
+                    time.sleep(1)
+                    continue
         try:
             uid = uid_queue.get(timeout=5)
         except Empty:
@@ -78,23 +84,26 @@ def followee_url_process(uid_with_trash_queue, user_waiting_resolve_url_queue, o
 
         max_followee_page = 0 if current_user.followees == 0 else current_user.followees / 20 + 1
         while current_user.getFollowees < max_followee_page and not (shutdown.get() or localShutdown.value):
-            if failedCount > 5 and operator:
+            if failedCount > 5:
                 print '///////URL 被封禁///////'
                 time.sleep(1)
-                print '>>>>>> 正在尝试重启...'
-                if not download.restart():
-                    print '/////////重启失败！/////////'
-                    localShutdown.value = True
-                    current_user.needGetFollowees = True
-                    user_dao.save_or_update(current_user)
-                    break
-                else:
-                    failedCount = 0
-                    time.sleep(10)
+                while failedCount > 5:
+                    if operator:
+                        print '>>>>>> 正在尝试重启...'
+                        if not download.restart():
+                            print '/////////重启失败！/////////'
+                            localShutdown.value = True
+                            break
+                        else:
+                            failedCount = 0
+                            time.sleep(10)
+                    else:
+                        print '>>>>>> 正在等待主线程重启...'
+                        time.sleep(1)
+                        continue
 
             msg = download.get_followees(hash_id=current_user.hashId, page=current_user.getFollowees)
             current_user.getFollowees += 1
-            current_user.needGetFollowees = False
             user_dao.save_or_update(current_user)
             print ">>>>> URL下载成功 - Followee ", current_user.getFollowees
             uids = resolver.resolve_for_uids(msg)
