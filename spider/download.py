@@ -12,6 +12,7 @@ cookie = Cookies()
 def start_download():
     global cookie
     cookie = cookies_dao.get_one_with_lock()
+    cookies_dao.lock_cookie(cookie)
 
 
 def get_content(url):
@@ -42,7 +43,7 @@ def get_followers(hash_id, page, url='ProfileFollowersListV2'):
         header = config.header
         header['Cookie'] = cookie.cookie
         header['X-Xsrftoken'] = cookie.xsrf
-        resp = requests.post("https://www.zhihu.com/node/" + url, data=data, headers=header, verify=False)
+        resp = requests.post("https://www.zhihu.com/node/" + url, data=data, headers=header)
         return resp.content
     except RequestException:
         return u""
@@ -60,6 +61,7 @@ def shut_down():
 def restart():
     global cookie
     cookie = cookies_dao.get_one_with_lock()
+    cookies_dao.lock_cookie(cookie)
     if cookie is not None:
         return True
     else:

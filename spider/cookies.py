@@ -26,7 +26,6 @@ class cookies_dao(object):
     def get_one_with_lock():
         global DBSession
         session = DBSession()
-        cookie_copy = Cookies()
         try:
             cookie = session.query(Cookies).filter(Cookies.available == True).first()
             cookie_copy = Cookies()
@@ -34,18 +33,13 @@ class cookies_dao(object):
             cookie_copy.cookie = cookie.cookie
             cookie_copy.xsrf = cookie.xsrf
             cookie_copy.relation = cookie.relation
-            cookie_copy.available = False
+            cookie_copy.available = cookie.available
             cookie_copy.disabled = cookie.disabled
             return cookie_copy
         except NoResultFound:
             pass
         finally:
             session.close()
-            if cookie_copy.id is not None:
-                session = DBSession()
-                session.merge(cookie_copy)
-                session.commit()
-                session.close()
 
     @staticmethod
     def release_lock(cookie):
@@ -63,5 +57,15 @@ class cookies_dao(object):
         if cookie is not None:
             session = DBSession()
             session.add(cookie)
+            session.commit()
+            session.close()
+
+    @staticmethod
+    def lock_cookie(cookie):
+        global DBSession
+        if cookie.id is not None:
+            session = DBSession()
+            cookie.available = False
+            session.merge(cookie)
             session.commit()
             session.close()
