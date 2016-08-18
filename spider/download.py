@@ -5,21 +5,25 @@ import config
 import json
 import cookies_dao
 
-cookie = None
+
+class CookieValue(object):
+    pass
+
+cookieWrapper = CookieValue()
 
 
 def start_download():
-    global cookie
-    cookie = cookies_dao.get_one_with_lock()
-    cookies_dao.lock_cookie(cookie)
+    global cookieWrapper
+    cookieWrapper.value = cookies_dao.get_one_with_lock()
+    cookies_dao.lock_cookie(cookieWrapper.value)
 
 
 def get_content(url):
-    global cookie
+    global cookieWrapper
     try:
         header = config.header
-        header['Cookie'] = cookie.cookie
-        header['X-Xsrftoken'] = cookie.xsrf
+        header['Cookie'] = cookieWrapper.value.cookie
+        header['X-Xsrftoken'] = cookieWrapper.value.xsrf
         resp = requests.get(url, headers=header, verify=False)
     except RequestException:
         print "/////////RequestException!/////////"
@@ -28,7 +32,7 @@ def get_content(url):
 
 
 def get_followers(hash_id, page, url='ProfileFollowersListV2'):
-    global cookie
+    global cookieWrapper
     params = {
         'offset': page * 20,
         'hash_id': hash_id,
@@ -41,9 +45,9 @@ def get_followers(hash_id, page, url='ProfileFollowersListV2'):
     }
     try:
         header = config.header
-        header['Cookie'] = cookie.cookie
-        header['X-Xsrftoken'] = cookie.xsrf
-        resp = requests.post("https://www.zhihu.com/node/" + url, data=data, headers=header, verify=False)
+        header['Cookie'] = cookieWrapper.value.cookie
+        header['X-Xsrftoken'] = cookieWrapper.value.xsrf
+        resp = requests.post("https://www.zhihu.com/node/" + url, data=data, headers=header)
         return resp.content
     except RequestException:
         print "/////////RequestException!/////////"
@@ -55,15 +59,15 @@ def get_followees(hash_id, page):
 
 
 def shut_down():
-    global cookie
-    cookies_dao.release_lock(cookie)
+    global cookieWrapper
+    cookies_dao.release_lock(cookieWrapper.value)
 
 
 def restart():
-    global cookie
-    cookie = cookies_dao.get_one_with_lock()
-    cookies_dao.lock_cookie(cookie)
-    if cookie is not None:
+    global cookieWrapper
+    cookieWrapper.value = cookies_dao.get_one_with_lock()
+    cookies_dao.lock_cookie(cookieWrapper.value)
+    if cookieWrapper.value is not None:
         return True
     else:
         return False
