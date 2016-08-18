@@ -42,7 +42,10 @@ def download_process(uid_queue, operator, shutdown, localShutdown):
                 failedCount = 0
                 time.sleep(10)
 
-        uid = uid_queue.get(timeout=15)
+        try:
+            uid = uid_queue.get(timeout=5)
+        except Empty:
+            continue
         url = resolver.get_url_by_uid(uid)
         content = download.get_content(url)
         threading.Thread(target=resolve_thread, args=(content,)).start()
@@ -225,7 +228,7 @@ def before_shut_down(all_uid_list, uid_queue, uid_with_trash_queue):
         uid_list = []
         while not uid_with_trash_queue.empty():
             try:
-                uid = uid_with_trash_queue.get(timeout=15)
+                uid = uid_with_trash_queue.get(timeout=5)
             except Empty:
                 continue
             uid_list.append(uid)
@@ -351,12 +354,12 @@ def start_url_resolver(address, port, localShutdown):
     uid_with_trash_queue = manager.get_uid_with_trash_queue()
     shutdown = manager.get_shutdown()
     followee_lock = manager.get_followee_url_lock()
-    follower_lock = manager.get_follower_url_lock()
+    # follower_lock = manager.get_follower_url_lock()
 
     process = [
         # Process(target=followee_url_process, args=(uid_with_trash_queue, True, followee_lock, shutdown, localShutdown,)),
-        Process(target=follower_url_process, args=(uid_with_trash_queue, True, followee_lock, shutdown, localShutdown,)),
-        Process(target=followee_url_process, args=(uid_with_trash_queue, False, follower_lock, shutdown, localShutdown,))]
+        # Process(target=follower_url_process, args=(uid_with_trash_queue, True, follower_lock, shutdown, localShutdown,)),
+        Process(target=followee_url_process, args=(uid_with_trash_queue, True, followee_lock, shutdown, localShutdown,))]
     start_process(process)
 
     local_shutdown_listener(localShutdown)
