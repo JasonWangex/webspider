@@ -344,8 +344,6 @@ def start_download(address, port, localShutdown):
     process = []
     download.start_download()
     process.append(Process(target=download_process, args=(uid_queue, True, shutdown, localShutdown,)))
-    for i in range(1):
-        process.append(Process(target=download_process, args=(uid_queue, False, shutdown, localShutdown,)))
     start_process(process)
     local_shutdown_listener(localShutdown)
 
