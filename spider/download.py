@@ -20,7 +20,7 @@ def get_content(url):
         header = config.header
         header['Cookie'] = cookie.cookie
         header['X-Xsrftoken'] = cookie.xsrf
-        resp = requests.get(url, headers=config.header, verify=False)
+        resp = requests.get(url, headers=header, verify=False)
     except SSLError:
         return u""
     return resp.content
