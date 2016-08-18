@@ -4,6 +4,8 @@ from Queue import Full, Empty
 
 from multiprocessing.managers import BaseManager, Value
 
+from mysql.connector import Error
+
 import config
 import resolver
 import download
@@ -76,16 +78,24 @@ def followee_url_process(uid_with_trash_queue, user_waiting_resolve_url_queue, o
     global failedCount
     while not (shutdown.get() or localShutdown.value):
         user_id = user_waiting_resolve_url_queue.get()
-        current_user = user_dao.get_user_for_followees(user_id=user_id)
+        try:
+            current_user = user_dao.get_user_for_followees(user_id=user_id)
+        except Error:
+            print "mysql connector error !!!"
+            time.sleep(5)
+            continue
+
         if current_user is None:
             continue
 
         max_followee_page = 0 if current_user.followees == 0 else current_user.followees / 20 + 1
         while current_user.getFollowees < max_followee_page and not (shutdown.get() or localShutdown.value):
             if failedCount > 5:
-                print '///////URL 被封禁///////'
-                time.sleep(1)
-                while failedCount > 5:
+                print '///////URL 疑似被封禁///////'
+                print failedCount
+                time.sleep(0.5)
+                while failedCount > 10:
+                    print '///////URL 被封禁///////'
                     if operator:
                         print '>>>>>> 正在尝试重启...'
                         if not download.restart():
@@ -120,7 +130,7 @@ def followee_url_process(uid_with_trash_queue, user_waiting_resolve_url_queue, o
                     else:
                         print ">>>>>", uid, "is lost!"
                         continue
-            user_dao.save_or_update(current_user)
+            # user_dao.save_or_update(current_user)
         current_user.needGetFollowees = False
         current_user.getFollowees = max_followee_page
         user_dao.save_or_update(current_user)
