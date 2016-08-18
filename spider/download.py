@@ -68,15 +68,18 @@ def shut_down():
 def restart():
     global cookieWrapper
     failed = 0
-    while failed > 3:
+    while failed < 3:
         try:
             cookieWrapper.value = cookies_dao.get_one()
+            cookies_dao.lock_cookie(cookieWrapper.value)
+            if cookieWrapper.value is not None:
+                return True
+            else:
+                return False
         except Error:
             failed += 1
             time.sleep(5)
             continue
-    cookies_dao.lock_cookie(cookieWrapper.value)
-    if cookieWrapper.value is not None:
-        return True
     else:
         return False
+
