@@ -4,7 +4,7 @@ from Domain import Cookies
 import config
 
 
-def get_one_with_lock():
+def get_one():
     session = config.DBSession()
     try:
         cookie = session.query(Cookies).filter(Cookies.available == True).first()

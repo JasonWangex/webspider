@@ -1,5 +1,7 @@
 # coding=utf8
 import requests
+import time
+from mysql.connector import Error
 from requests.exceptions import RequestException
 import config
 import json
@@ -14,7 +16,7 @@ cookieWrapper = CookieValue()
 
 def start_download():
     global cookieWrapper
-    cookieWrapper.value = cookies_dao.get_one_with_lock()
+    cookieWrapper.value = cookies_dao.get_one()
     cookies_dao.lock_cookie(cookieWrapper.value)
 
 
@@ -65,7 +67,14 @@ def shut_down():
 
 def restart():
     global cookieWrapper
-    cookieWrapper.value = cookies_dao.get_one_with_lock()
+    failed = 0
+    while failed > 3:
+        try:
+            cookieWrapper.value = cookies_dao.get_one()
+        except Error:
+            failed += 1
+            time.sleep(5)
+            continue
     cookies_dao.lock_cookie(cookieWrapper.value)
     if cookieWrapper.value is not None:
         return True
