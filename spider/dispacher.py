@@ -130,7 +130,7 @@ def followee_url_process(uid_with_trash_queue, user_waiting_resolve_url_queue, o
                     else:
                         print ">>>>>", uid, "is lost!"
                         continue
-            # user_dao.save_or_update(current_user)
+            user_dao.save_or_update(current_user)
         current_user.needGetFollowees = False
         current_user.getFollowees = max_followee_page
         user_dao.save_or_update(current_user)
