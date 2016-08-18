@@ -355,6 +355,7 @@ def start_download(address, port, localShutdown):
     process.append(Process(target=download_process, args=(uid_queue, True, shutdown, localShutdown,)))
     start_process(process)
     local_shutdown_listener(localShutdown)
+    download.shut_down()
 
 
 def start_url_resolver(address, port, localShutdown):
@@ -381,5 +382,5 @@ def start_url_resolver(address, port, localShutdown):
         Process(target=followee_url_process,
                 args=(uid_with_trash_queue, user_waiting_resolve_url_queue, True, shutdown, localShutdown,))]
     start_process(process)
-
     local_shutdown_listener(localShutdown)
+    download.shut_down()

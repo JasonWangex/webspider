@@ -1,6 +1,6 @@
 # coding=utf8
 import requests
-from requests.exceptions import SSLError
+from requests.exceptions import RequestException
 import config
 import json
 from Domain import Cookies
@@ -21,7 +21,7 @@ def get_content(url):
         header['Cookie'] = cookie.cookie
         header['X-Xsrftoken'] = cookie.xsrf
         resp = requests.get(url, headers=header, verify=False)
-    except SSLError:
+    except RequestException:
         return u""
     return resp.content
 
@@ -44,7 +44,7 @@ def get_followers(hash_id, page, url='ProfileFollowersListV2'):
         header['X-Xsrftoken'] = cookie.xsrf
         resp = requests.post("https://www.zhihu.com/node/" + url, data=data, headers=header, verify=False)
         return resp.content
-    except SSLError:
+    except RequestException:
         return u""
 
 
