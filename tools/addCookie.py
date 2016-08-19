@@ -1,9 +1,7 @@
 # coding=utf-8
-from spider import cookies
+from spider import cookies_dao
 from spider.Domain import Cookies
-from spider.cookies import cookies_dao
 
-cookies.start_session()
 while True:
     print "请输入Cookie:"
     cookie_ = raw_input(">")
