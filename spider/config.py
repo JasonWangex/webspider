@@ -1,6 +1,4 @@
-import cookielib
-
-import requests
+# coding=utf-8
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 
@@ -14,12 +12,13 @@ header = {
     "X-Xsrftoken": "",
 }
 first_uid = "boxun"
-auth_key = "asdfasldfhaskn45576asd5fas6df43as6as7f6as4"
+auth_key = "TcaKht7bBvqWt6Q6UaRXFPxJUBNfyv6EsJEWikpYpf7nvYYrEbpbvK9H7eWXAk3J"
 
 engine = create_engine(
-    'mysql+mysqlconnector://cdb_outerroot:cdb_outerroot@57b17a81a1ef5.sh.cdb.myqcloud.com:6065/zhihu_users?charset=utf8mb4'
+    'mysql+mysqlconnector://cdb_outerroot:pPZKSiC2Kkmpt54@57b17a81a1ef5.sh.cdb.myqcloud.com:6065/zhihu_users?charset=utf8mb4'
 )
 DBSession = sessionmaker(bind=engine)
+# 以下为原始cookie
 # header = '''Accept:*/*
 # Accept-Encoding:gzip, deflate, br
 # Accept-Language:zh-CN,zh;q=0.8,en;q=0.6
