@@ -83,3 +83,13 @@ def restart():
     else:
         return False
 
+
+# for test cookie
+# def getNextCookie():
+#     global cookieWrapper
+#     cookieWrapper.value = cookies_dao.get_one(cookieWrapper.value.id)
+#
+#
+# def lockCookie():
+#     global cookieWrapper
+#     cookies_dao.lock_cookie(cookieWrapper.value)

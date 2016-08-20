@@ -12,11 +12,9 @@ import download
 import user_dao
 import failed_dao
 import threading
-from Domain import Failed, User
+from Domain import Failed
 from multiprocessing import Process, Lock
-from multiprocessing import Queue
 
-import cookies_dao
 
 try:
     import cPickle as pickle
@@ -24,7 +22,6 @@ except ImportError:
     import pickle
 
 failedCount = 0
-download_lock = Lock()
 
 
 def download_process(uid_queue, operator, shutdown, localShutdown):
@@ -178,32 +175,6 @@ def follower_url_process(uid_with_trash_queue, operator, shutdown, localShutdown
         user_dao.save_or_update(current_user)
 
 
-def fill_user_queue_process(user_waiting_resolve_url_queue, shutdown):
-    current_user = User()
-    while not shutdown.get():
-        current_user = user_dao.get_next_user(current_user)
-        time.sleep(0.01)
-        try:
-            if current_user is not None:
-                user_waiting_resolve_url_queue.put(current_user.id, timeout=5)
-        except Full:
-            current_user.id -= 1
-            continue
-
-
-def report(uid_queue, uid_with_trash_queue, all_uid_list, user_waiting_resolve_url_queue, shutdown):
-    while not shutdown.get():
-        time.sleep(10)
-        if shutdown.get():
-            break
-        print "\n////////////数据报告////////////"
-        print ">>>> 待解析 uid 列表: ", uid_queue.qsize()
-        print ">>>> 待清洗 uid 列表: ", uid_with_trash_queue.qsize()
-        print ">>>> 总解析 uid 列表: ", len(all_uid_list)
-        print ">>>> 总解析  id 列表: ", user_waiting_resolve_url_queue.qsize()
-        print "////////////数据报告////////////\n"
-
-
 def shutdown_listener(shutdown):
     while raw_input() != 'exit':
         continue
@@ -221,123 +192,8 @@ def start_process(procs):
         proc.start()
 
 
-def clean_uid(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
-    while not shutdown.get():
-        try:
-            waiting_clean_uid = uid_with_trash_queue.get(timeout=5)
-        except Empty:
-            continue
-        if waiting_clean_uid not in all_uid_list:
-            uid_queue.put(waiting_clean_uid)
-            all_uid_list.append(waiting_clean_uid)
-
-
-def before_shut_down(all_uid_list, uid_queue, uid_with_trash_queue):
-    print '>>>>>> 信息存储中'
-    with open('all_uid_list', 'wb') as f_all_uid:
-        pickle.dump(all_uid_list, file=f_all_uid)
-    print '>>>>>> 总解析uid列表 存储完毕'
-
-    with open('uid_queue', 'wb') as f_uid_queue:
-        # queue 无法序列化, 只能转成list
-        uid_list = []
-        while not uid_queue.empty():
-            uid = uid_queue.get(timeout=15)
-            uid_list.append(uid)
-        pickle.dump(uid_list, file=f_uid_queue)
-    print '>>>>>> 待解析uid列表 存储完毕'
-
-    with open('uid_with_trash', 'wb') as f_uid_with_trash_queue:
-        uid_list = []
-        while not uid_with_trash_queue.empty():
-            try:
-                uid = uid_with_trash_queue.get(timeout=5)
-            except Empty:
-                continue
-            uid_list.append(uid)
-        pickle.dump(uid_list, file=f_uid_with_trash_queue)
-    print '>>>>>> 待清洗uid列表 存储完毕'
-    print '\n/////////系统关闭！/////////'
-
-
 class QueueManager(BaseManager):
     pass
-
-
-def start_master(port):
-    all_uid_list = []
-    uid_queue = Queue(1000)
-    uid_with_trash_queue = Queue(5000)
-    user_waiting_resolve_url_queue = Queue(200)
-
-    shutdown = Value('i', False)
-
-    QueueManager.register('get_uid_queue', callable=lambda: uid_queue)
-    QueueManager.register('get_uid_with_trash_queue', callable=lambda: uid_with_trash_queue)
-    QueueManager.register('get_shutdown', callable=lambda: shutdown)
-    QueueManager.register('get_user_waiting_resolve_url_queue', callable=lambda: user_waiting_resolve_url_queue)
-
-    manager = QueueManager(address=('', port), authkey=config.auth_key)
-    manager.start()
-
-    uid_queue = manager.get_uid_queue()
-    uid_with_trash_queue = manager.get_uid_with_trash_queue()
-    shutdown = manager.get_shutdown()
-    user_waiting_resolve_url_queue = manager.get_user_waiting_resolve_url_queue()
-
-    print '/////// 系统启动 - 主节点 ///////'
-
-    with open('all_uid_list', 'rb') as f_all_uid:
-        if f_all_uid.readline() != "":
-            f_all_uid.seek(0)
-            all_uid_list = pickle.load(f_all_uid)
-    print '>>>>>>> 初始化 总解析uid列表 完毕'
-
-    clean_thread = threading.Thread(target=clean_uid, args=(uid_queue, uid_with_trash_queue, all_uid_list, shutdown))
-    clean_thread.start()
-    report_thread = threading.Thread(target=report, args=(
-        uid_queue, uid_with_trash_queue, all_uid_list, user_waiting_resolve_url_queue, shutdown))
-    report_thread.start()
-    fill_user_queue = Process(target=fill_user_queue_process, args=(user_waiting_resolve_url_queue, shutdown))
-    fill_user_queue.start()
-
-    with open('uid_queue', 'rb') as f_uid_queue:
-        if f_uid_queue.readline() != "":
-            f_uid_queue.seek(0)
-            uid_list = pickle.load(f_uid_queue)
-            if len(uid_list) == 0:
-                uid_queue.put(config.first_uid)
-
-            for uid in uid_list:
-                try:
-                    uid_queue.put(uid, timeout=60)
-                except Full:
-                    pass
-
-    print '>>>>>>> 初始化 待解析uid列表 完毕'
-
-    with open('uid_with_trash', 'rb') as f_uid_with_trash:
-        if f_uid_with_trash.readline() != "":
-            f_uid_with_trash.seek(0)
-            uid_list = pickle.load(f_uid_with_trash)
-            for uid in uid_list:
-                try:
-                    uid_with_trash_queue.put(uid, timeout=60)
-                except Full:
-                    pass
-    print '>>>>>>> 初始化 待清洗uid列表 完毕'
-
-    shutdown_listener_thread = threading.Thread(target=shutdown_listener, args=(shutdown,))
-    shutdown_listener_thread.start()
-    shutdown_listener_thread.join()
-    report_thread.join()
-    # 关闭服务
-    before_shut_down(all_uid_list, uid_queue, uid_with_trash_queue)
-    print '>>>>>>> 系统将在 20 秒后关闭<<<<<<<'
-    for i in range(20, 1, -1):
-        print ">>>>>>> 系统将在 ", i, " 秒后关闭<<<<<<<"
-        time.sleep(1)
-    manager.shutdown()
 
 
 def start_download(address, port, localShutdown):
@@ -376,8 +232,6 @@ def start_url_resolver(address, port, localShutdown):
     user_waiting_resolve_url_queue = manager.get_user_waiting_resolve_url_queue()
 
     process = [
-        # Process(target=followee_url_process, args=(uid_with_trash_queue, True, followee_lock, shutdown, localShutdown,)),
-        # Process(target=follower_url_process, args=(uid_with_trash_queue, True, follower_lock, shutdown, localShutdown,)),
         Process(target=followee_url_process,
                 args=(uid_with_trash_queue, user_waiting_resolve_url_queue, True, shutdown, localShutdown,))]
     start_process(process)

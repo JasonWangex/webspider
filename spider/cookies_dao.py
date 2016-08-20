@@ -4,10 +4,10 @@ from Domain import Cookies
 import config
 
 
-def get_one():
+def get_one(cookie_id=0):
     session = config.DBSession()
     try:
-        cookie = session.query(Cookies).filter(Cookies.available == True).first()
+        cookie = session.query(Cookies).filter(Cookies.available == True).filter(Cookies.id > cookie_id).first()
         cookie_copy = Cookies()
         cookie_copy.id = cookie.id
         cookie_copy.cookie = cookie.cookie
