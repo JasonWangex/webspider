@@ -7,7 +7,7 @@ import sys
 #         address   (master ip, if master : 0)
 #         port      (master port)
 from multiprocessing import Value
-
+import translate
 import dispacher
 
 if __name__ == '__main__':
@@ -24,7 +24,10 @@ if __name__ == '__main__':
         print 'invalid port value'
 
     if command_type == 'm':
-        dispacher.start_master(port)
+        translate.start_master(port)
+
+    elif command_type == 'vm':
+        translate.start_trash_queue_manager(port, localShutdown)
 
     elif command_type == 'd':
         dispacher.start_download(address, port, localShutdown)

@@ -2,7 +2,7 @@
 import time
 from Queue import Full, Empty
 
-from multiprocessing.managers import BaseManager, Value
+from multiprocessing.managers import BaseManager
 
 from mysql.connector import Error
 
@@ -13,7 +13,7 @@ import user_dao
 import failed_dao
 import threading
 from Domain import Failed
-from multiprocessing import Process, Lock
+from multiprocessing import Process
 
 
 try:
