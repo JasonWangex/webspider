@@ -26,7 +26,7 @@ failedCount = 0
 
 def download_process(uid_queue, operator, shutdown, localShutdown):
     global failedCount
-    while not (shutdown.get() or localShutdown.value):
+    while not localShutdown.value:
         if failedCount > 5:
             print '/////////下载被封禁！/////////'
             time.sleep(1)
@@ -73,7 +73,7 @@ def resolve_thread(content):
 
 def followee_url_process(uid_with_trash_queue, user_waiting_resolve_url_queue, operator, shutdown, localShutdown):
     global failedCount
-    while not (shutdown.get() or localShutdown.value):
+    while not localShutdown.value:
         user_id = user_waiting_resolve_url_queue.get()
         try:
             current_user = user_dao.get_user_for_followees(user_id=user_id)
@@ -86,7 +86,7 @@ def followee_url_process(uid_with_trash_queue, user_waiting_resolve_url_queue, o
             continue
 
         max_followee_page = 0 if current_user.followees == 0 else current_user.followees / 20 + 1
-        while current_user.getFollowees < max_followee_page and not (shutdown.get() or localShutdown.value):
+        while current_user.getFollowees < max_followee_page and not localShutdown.value:
             if failedCount > 5:
                 print '///////URL 疑似被封禁///////'
                 print failedCount
@@ -120,7 +120,7 @@ def followee_url_process(uid_with_trash_queue, user_waiting_resolve_url_queue, o
                 try:
                     uid_with_trash_queue.put(uid, timeout=10)
                 except Full:
-                    if shutdown.get() or localShutdown.value:
+                    if localShutdown.value:
                         current_user.needGetFollowees = True
                         user_dao.save_or_update(current_user)
                         return
@@ -135,13 +135,13 @@ def followee_url_process(uid_with_trash_queue, user_waiting_resolve_url_queue, o
 
 def follower_url_process(uid_with_trash_queue, operator, shutdown, localShutdown):
     global failedCount
-    while not (shutdown.get() or localShutdown.value):
+    while not localShutdown.value:
         current_user = user_dao.get_user_for_followers()
         if current_user is None:
             continue
 
         max_follower_page = 0 if current_user.followers == 0 else current_user.followers / 20 + 1
-        while current_user.getFollowers < max_follower_page and not (shutdown.get() or localShutdown.value):
+        while current_user.getFollowers < max_follower_page and not localShutdown.value:
             if failedCount > 5 and operator:
                 print '///////URL 被封禁///////'
                 time.sleep(1)
@@ -165,7 +165,7 @@ def follower_url_process(uid_with_trash_queue, operator, shutdown, localShutdown
                 try:
                     uid_with_trash_queue.put(uid, timeout=10)
                 except Full:
-                    if shutdown.get() or localShutdown.value:
+                    if localShutdown.value:
                         return
                     else:
                         print ">>>>>", uid, "is lost!"

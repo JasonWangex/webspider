@@ -62,7 +62,7 @@ def start_master(port):
 
 # 仅仅将trash uid存入redis
 def start_trash_queue_manager(port, localShutdown):
-    print '/////// 系统启动 - RUL节点 ///////'
+    print '/////// 系统启动 - 转发节点 ///////'
     user_waiting_resolve_url_queue = Queue(20)
     uid_with_trash_queue = Queue(500)
     uid_queue = Queue(50)
@@ -109,9 +109,9 @@ def translate_uid(uid_queue, redis_client, localShutdown,):
             continue
 
 
-def fill_user_queue_process(user_waiting_resolve_url_queue, shutdown):
+def fill_user_queue_process(user_waiting_resolve_url_queue, localShutdown):
     current_user = User()
-    while not shutdown.get():
+    while not localShutdown.value:
         current_user = user_dao.get_next_user(current_user)
         time.sleep(0.01)
         try:
