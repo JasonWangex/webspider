@@ -2,7 +2,7 @@
 from Queue import Empty, Full, Queue
 from multiprocessing import Process
 from multiprocessing.managers import BaseManager, Value
-from dispacher import local_shutdown_listener, shutdown_listener
+from dispacher import local_shutdown_listener
 from Domain import User
 
 import pickle
@@ -17,19 +17,12 @@ class QueueManager(BaseManager):
     pass
 
 
-def start_master(port):
+def start_clean(port):
     all_uid_list = []
-    shutdown = Value('i', False)
+    localShutdown = Value('i', False)
 
     redis_client = redis.StrictRedis(host='1daf5146eb844741.m.cnsha.kvstore.aliyuncs.com', port=6379,
                                      password=config.password)
-
-    QueueManager.register('get_shutdown', callable=lambda: shutdown)
-
-    manager = QueueManager(address=('', port), authkey=config.auth_key)
-    manager.start()
-
-    shutdown = manager.get_shutdown()
 
     print '/////// 系统启动 - 主节点 ///////'
 
@@ -40,24 +33,21 @@ def start_master(port):
     print '>>>>>>> 初始化 总解析uid列表 完毕'
 
     # 清洗uid
-    clean_thread = threading.Thread(target=clean_uid, args=(all_uid_list, redis_client, shutdown))
+    clean_thread = threading.Thread(target=clean_uid, args=(all_uid_list, redis_client, localShutdown))
     clean_thread.start()
 
     # 数据报告
-    report_thread = threading.Thread(target=report, args=(all_uid_list, redis_client, shutdown,))
+    report_thread = threading.Thread(target=report, args=(all_uid_list, redis_client, localShutdown,))
     report_thread.start()
 
-    shutdown_listener_thread = threading.Thread(target=shutdown_listener, args=(shutdown,))
-    shutdown_listener_thread.start()
-    shutdown_listener_thread.join()
+    local_shutdown_listener(localShutdown)
     report_thread.join()
     # 关闭服务
     before_shut_down(all_uid_list)
-    print '>>>>>>> 系统将在 20 秒后关闭<<<<<<<'
-    for i in range(19, 0, -1):
-        print ">>>>>>> 系统将在 ", i, " 秒后关闭<<<<<<<"
+    print '>>>>>>> 系统将在  5  秒后关闭<<<<<<<'
+    for i in range(4, 0, -1):
         time.sleep(1)
-    manager.shutdown()
+        print ">>>>>>> 系统将在 ", i, " 秒后关闭<<<<<<<"
 
 
 # 仅仅将trash uid存入redis
@@ -104,7 +94,7 @@ def translate_uid(uid_queue, redis_client, localShutdown,):
     while not localShutdown.value:
         try:
             uid = redis_client.blpop("cleaned_uid", timeout=30)
-            uid_queue.put(uid, timeout=15)
+            uid_queue.put(uid, timeout=60)
         except Full:
             continue
 
@@ -131,7 +121,7 @@ def report(all_uid_list, redis_client, shutdown):
         current_length = len(all_uid_list)
         print "\n////////////数据报告////////////"
         print ">>>> 待解析 uid 列表: ", redis_client.llen("cleaned_uid")
-        print ">>>> 待清洗 uid 列表: ", redis_client.llen("cleaned_uid")
+        print ">>>> 待清洗 uid 列表: ", redis_client.llen("uid_with_trash")
         print ">>>> 总解析 uid 列表: ", current_length
         print ">>>> 总解析 uid 速率: ", (current_length - last_length) / 10, "个/秒"
         print "////////////数据报告////////////\n"

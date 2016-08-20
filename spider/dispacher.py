@@ -24,7 +24,7 @@ except ImportError:
 failedCount = 0
 
 
-def download_process(uid_queue, operator, shutdown, localShutdown):
+def download_process(uid_queue, operator, localShutdown):
     global failedCount
     while not localShutdown.value:
         if failedCount > 5:
@@ -71,7 +71,7 @@ def resolve_thread(content):
         failedCount += 1
 
 
-def followee_url_process(uid_with_trash_queue, user_waiting_resolve_url_queue, operator, shutdown, localShutdown):
+def followee_url_process(uid_with_trash_queue, user_waiting_resolve_url_queue, operator, localShutdown):
     global failedCount
     while not localShutdown.value:
         user_id = user_waiting_resolve_url_queue.get()
@@ -133,7 +133,7 @@ def followee_url_process(uid_with_trash_queue, user_waiting_resolve_url_queue, o
         user_dao.save_or_update(current_user)
 
 
-def follower_url_process(uid_with_trash_queue, operator, shutdown, localShutdown):
+def follower_url_process(uid_with_trash_queue, operator, localShutdown):
     global failedCount
     while not localShutdown.value:
         current_user = user_dao.get_user_for_followers()
@@ -175,12 +175,6 @@ def follower_url_process(uid_with_trash_queue, operator, shutdown, localShutdown
         user_dao.save_or_update(current_user)
 
 
-def shutdown_listener(shutdown):
-    while raw_input() != 'exit':
-        continue
-    shutdown.set(True)
-
-
 def local_shutdown_listener(localShutdown):
     while not localShutdown.value and raw_input() != 'exit':
         continue
@@ -199,17 +193,15 @@ class QueueManager(BaseManager):
 def start_download(address, port, localShutdown):
     print '/////// 系统启动 - 下载节点 ///////'
     QueueManager.register('get_uid_queue')
-    QueueManager.register('get_shutdown')
 
     manager = QueueManager(address=(address, port), authkey=config.auth_key)
     manager.connect()
 
     uid_queue = manager.get_uid_queue()
-    shutdown = manager.get_shutdown()
 
     process = []
     download.start_download()
-    process.append(Process(target=download_process, args=(uid_queue, True, shutdown, localShutdown,)))
+    process.append(Process(target=download_process, args=(uid_queue, True, localShutdown,)))
     start_process(process)
     local_shutdown_listener(localShutdown)
     download.shut_down()
@@ -219,7 +211,6 @@ def start_url_resolver(address, port, localShutdown):
     print '/////// 系统启动 - RUL节点 ///////'
 
     QueueManager.register('get_uid_with_trash_queue')
-    QueueManager.register('get_shutdown')
     QueueManager.register('get_user_waiting_resolve_url_queue')
 
     manager = QueueManager(address=(address, port), authkey=config.auth_key)
@@ -228,12 +219,11 @@ def start_url_resolver(address, port, localShutdown):
     download.start_download()
 
     uid_with_trash_queue = manager.get_uid_with_trash_queue()
-    shutdown = manager.get_shutdown()
     user_waiting_resolve_url_queue = manager.get_user_waiting_resolve_url_queue()
 
     process = [
         Process(target=followee_url_process,
-                args=(uid_with_trash_queue, user_waiting_resolve_url_queue, True, shutdown, localShutdown,))]
+                args=(uid_with_trash_queue, user_waiting_resolve_url_queue, True, localShutdown,))]
     start_process(process)
     local_shutdown_listener(localShutdown)
     download.shut_down()

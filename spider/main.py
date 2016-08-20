@@ -3,7 +3,7 @@ import sys
 
 # spider begin
 # command is
-#         type      (m master, d download, u url resolver)
+#         type      (c cleaned, t translate, d download, u url resolver)
 #         address   (master ip, if master : 0)
 #         port      (master port)
 from multiprocessing import Value
@@ -23,10 +23,10 @@ if __name__ == '__main__':
     except ValueError:
         print 'invalid port value'
 
-    if command_type == 'm':
-        translate.start_master(port)
+    if command_type == 'c':
+        translate.start_clean(port)
 
-    elif command_type == 'vm':
+    elif command_type == 't':
         translate.start_trash_queue_manager(port, localShutdown)
 
     elif command_type == 'd':
