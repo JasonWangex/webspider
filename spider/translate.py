@@ -21,15 +21,14 @@ def start_master(port):
     all_uid_list = []
     shutdown = Value('i', False)
 
-    redis_client = redis.StrictRedis(host='1daf5146eb844741.m.cnsha.kvstore.aliyuncs.com', port=6379, password=config.password)
+    redis_client = redis.StrictRedis(host='1daf5146eb844741.m.cnsha.kvstore.aliyuncs.com', port=6379,
+                                     password=config.password)
 
     QueueManager.register('get_shutdown', callable=lambda: shutdown)
 
     manager = QueueManager(address=('', port), authkey=config.auth_key)
     manager.start()
 
-    uid_queue = manager.get_uid_queue()
-    uid_with_trash_queue = manager.get_uid_with_trash_queue()
     shutdown = manager.get_shutdown()
 
     print '/////// 系统启动 - 主节点 ///////'
@@ -41,7 +40,7 @@ def start_master(port):
     print '>>>>>>> 初始化 总解析uid列表 完毕'
 
     # 清洗uid
-    clean_thread = threading.Thread(target=clean_uid, args=(uid_queue, uid_with_trash_queue, all_uid_list, shutdown))
+    clean_thread = threading.Thread(target=clean_uid, args=(all_uid_list, shutdown))
     clean_thread.start()
 
     # 数据报告
@@ -73,7 +72,8 @@ def start_trash_queue_manager(port, localShutdown):
     QueueManager.register('get_uid_queue', callable=lambda: uid_queue)
 
     # 在网络注册redis client 与 manager
-    redis_client = redis.StrictRedis(host='1daf5146eb844741.m.cnsha.kvstore.aliyuncs.com', port=6379, password=config.password)
+    redis_client = redis.StrictRedis(host='1daf5146eb844741.m.cnsha.kvstore.aliyuncs.com', port=6379,
+                                     password=config.password)
     manager = QueueManager(address=('', port), authkey=config.auth_key)
     manager.start()
 
@@ -100,7 +100,7 @@ def translate_trash_uid(uid_with_trash_queue, redis_client, localShutdown):
             continue
 
 
-def translate_uid(uid_queue, redis_client, localShutdown,):
+def translate_uid(uid_queue, redis_client, localShutdown, ):
     while not localShutdown.value:
         try:
             uid = redis_client.blpop("cleaned_uid", timeout=30)
@@ -138,15 +138,15 @@ def report(all_uid_list, redis_client, shutdown):
         last_length = current_length
 
 
-def clean_uid(uid_queue, uid_with_trash_queue, all_uid_list, shutdown):
+def clean_uid(all_uid_list, redis_client, shutdown):
     while not shutdown.get():
         try:
-            waiting_clean_uid = uid_with_trash_queue.get(timeout=5)
-        except Empty:
+            uid_with_trash = redis_client.blpop(timeout=15)
+        except redis.TimeoutError:
             continue
-        if waiting_clean_uid not in all_uid_list:
-            uid_queue.put(waiting_clean_uid)
-            all_uid_list.append(waiting_clean_uid)
+        if uid_with_trash not in all_uid_list:
+            redis_client.lpush(uid_with_trash)
+            all_uid_list.append(uid_with_trash)
 
 
 def before_shut_down(all_uid_list):
