@@ -40,7 +40,7 @@ def start_master(port):
     print '>>>>>>> 初始化 总解析uid列表 完毕'
 
     # 清洗uid
-    clean_thread = threading.Thread(target=clean_uid, args=(all_uid_list, shutdown))
+    clean_thread = threading.Thread(target=clean_uid, args=(all_uid_list, redis_client, shutdown))
     clean_thread.start()
 
     # 数据报告
@@ -85,8 +85,8 @@ def start_trash_queue_manager(port, localShutdown):
             args=(uid_with_trash_queue, redis_client, localShutdown,)).start()
     Process(target=translate_uid,
             args=(uid_queue, redis_client, localShutdown,)).start()
-    Process(target=translate_uid,
-            args=(uid_queue, redis_client, localShutdown,)).start()
+    Process(target=fill_user_queue_process,
+            args=(user_waiting_resolve_url_queue, localShutdown,)).start()
 
     local_shutdown_listener(localShutdown)
 
@@ -100,7 +100,7 @@ def translate_trash_uid(uid_with_trash_queue, redis_client, localShutdown):
             continue
 
 
-def translate_uid(uid_queue, redis_client, localShutdown, ):
+def translate_uid(uid_queue, redis_client, localShutdown,):
     while not localShutdown.value:
         try:
             uid = redis_client.blpop("cleaned_uid", timeout=30)
