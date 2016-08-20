@@ -141,11 +141,11 @@ def report(all_uid_list, redis_client, shutdown):
 def clean_uid(all_uid_list, redis_client, shutdown):
     while not shutdown.get():
         try:
-            uid_with_trash = redis_client.blpop(timeout=15)
+            uid_with_trash = redis_client.blpop("uid_with_trash", timeout=15)
         except redis.TimeoutError:
             continue
         if uid_with_trash not in all_uid_list:
-            redis_client.lpush(uid_with_trash)
+            redis_client.lpush("cleaned_uid", uid_with_trash)
             all_uid_list.append(uid_with_trash)
 
 
