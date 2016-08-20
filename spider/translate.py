@@ -1,17 +1,16 @@
 # coding=utf-8
-import threading
 from Queue import Empty, Full, Queue
 from multiprocessing import Process
 from multiprocessing.managers import BaseManager, Value
+from dispacher import local_shutdown_listener, shutdown_listener
+from Domain import User
 
 import pickle
 import redis
 import time
-
+import threading
+import user_dao
 import config
-from dispacher import local_shutdown_listener, shutdown_listener
-from spider import user_dao
-from spider.Domain import User
 
 
 class QueueManager(BaseManager):

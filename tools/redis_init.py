@@ -2,7 +2,9 @@
 import pickle
 import redis
 
-redis_client = redis.StrictRedis(host='1daf5146eb844741.m.cnsha.kvstore.aliyuncs.com', port=6379, password='')
+from spider import config
+
+redis_client = redis.StrictRedis(host='1daf5146eb844741.m.cnsha.kvstore.aliyuncs.com', port=6379, password=config.password)
 
 
 with open('uid_queue', 'rb') as f_uid_queue:
