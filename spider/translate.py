@@ -26,14 +26,8 @@ def start_clean(port):
 
     print '/////// 系统启动 - 主节点 ///////'
 
-    with open('all_uid_list', 'rb') as f_all_uid:
-        if f_all_uid.readline() != "":
-            f_all_uid.seek(0)
-            all_uid_list = pickle.load(f_all_uid)
-    print '>>>>>>> 初始化 总解析uid列表 完毕'
-
     # 清洗uid
-    clean_thread = threading.Thread(target=clean_uid, args=(all_uid_list, redis_client, localShutdown))
+    clean_thread = threading.Thread(target=clean_uid, args=(redis_client, localShutdown))
     clean_thread.start()
 
     # 数据报告
@@ -55,7 +49,7 @@ def start_trash_queue_manager(port, localShutdown):
     print '/////// 系统启动 - 转发节点 ///////'
     user_waiting_resolve_url_queue = Queue(20)
     uid_with_trash_queue = Queue(500)
-    uid_queue = Queue(50)
+    uid_queue = Queue(500)
 
     QueueManager.register('get_user_waiting_resolve_url_queue', callable=lambda: user_waiting_resolve_url_queue)
     QueueManager.register('get_uid_with_trash_queue', callable=lambda: uid_with_trash_queue)
@@ -128,15 +122,14 @@ def report(all_uid_list, redis_client, shutdown):
         last_length = current_length
 
 
-def clean_uid(all_uid_list, redis_client, shutdown):
-    while not shutdown.get():
-        try:
-            uid_with_trash = redis_client.blpop("uid_with_trash", timeout=15)
-        except redis.TimeoutError:
+def clean_uid(redis_client, localShutdown):
+    while not localShutdown.value:
+        uid_with_trash = redis_client.blpop("uid_with_trash", timeout=5)
+        if uid_with_trash is None:
             continue
-        if uid_with_trash not in all_uid_list:
+        if not redis_client.sismember('all_uid_list', uid_with_trash):
+            redis_client.sadd("all_uid_list", uid_with_trash)
             redis_client.lpush("cleaned_uid", uid_with_trash)
-            all_uid_list.append(uid_with_trash)
 
 
 def before_shut_down(all_uid_list):
