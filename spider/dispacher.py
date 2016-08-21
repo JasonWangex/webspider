@@ -164,7 +164,7 @@ def start_download(address, port, localShutdown):
     download.shut_down()
 
 
-def UserQueueManager(BaseManager):
+class UserQueueManager(BaseManager):
     pass
 
 
