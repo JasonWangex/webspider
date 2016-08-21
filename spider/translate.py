@@ -69,7 +69,14 @@ def start_trash_queue_manager(port, localShutdown):
     Process(target=fill_user_queue_process,
             args=(user_waiting_resolve_url_queue, localShutdown,)).start()
 
-    local_shutdown_listener(uid_queue, uid_with_trash_queue, redis_client, localShutdown)
+    while not localShutdown.value and raw_input() != 'exit':
+        continue
+    localShutdown.value = True
+    time.sleep(10)
+    for uid in uid_queue:
+        redis_client.lpush('cleaned_uid', uid)
+    for uid in uid_with_trash_queue:
+        redis_client.lpush('uid_with_trash', uid)
 
 
 def translate_trash_uid(uid_with_trash_queue, redis_client, localShutdown):
