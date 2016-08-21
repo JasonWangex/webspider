@@ -111,23 +111,21 @@ def followee_url_process(uid_with_trash_queue, user_waiting_resolve_url_queue, o
             current_user.getFollowees += 1
             print ">>>>> URL下载成功 - Followee ", current_user.getFollowees
             uids = resolver.resolve_for_uids(msg)
+            user_dao.save_or_update(current_user)
             if len(uids) == 0:
                 failedCount += 1
+                continue
             else:
                 failedCount = 0
-
-            for uid in uids:
-                try:
-                    uid_with_trash_queue.put(uid, timeout=10)
-                except Full:
-                    if localShutdown.value:
-                        current_user.needGetFollowees = True
-                        user_dao.save_or_update(current_user)
-                        return
-                    else:
-                        print ">>>>>", uid, "is lost!"
-                        continue
-            user_dao.save_or_update(current_user)
+            try:
+                uid_with_trash_queue.put(uids, timeout=10)
+            except Full:
+                if localShutdown.value:
+                    user_dao.save_or_update(current_user)
+                    return
+                else:
+                    print ">>>>> one uid lis is lost!", time.time()
+                    continue
         current_user.needGetFollowees = False
         current_user.getFollowees = max_followee_page
         user_dao.save_or_update(current_user)

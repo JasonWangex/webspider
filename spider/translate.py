@@ -85,8 +85,9 @@ def start_trash_queue_manager(port, localShutdown):
 def translate_trash_uid(uid_with_trash_queue, redis_client, localShutdown):
     while not localShutdown.value:
         try:
-            uid = uid_with_trash_queue.get(timeout=5)
-            redis_client.lpush("uid_with_trash", uid)
+            uids = uid_with_trash_queue.get(timeout=5)
+            for uid in uids:
+                redis_client.lpush("uid_with_trash", uid)
         except Empty:
             continue
 
