@@ -69,7 +69,7 @@ def start_trash_queue_manager(port, localShutdown):
     Process(target=fill_user_queue_process,
             args=(user_waiting_resolve_url_queue, localShutdown,)).start()
     Process(target=queue_report,
-            args=(uid_queue, uid_with_trash_queue, localShutdown,)).start()
+            args=(uid_queue, localShutdown,)).start()
     while not localShutdown.value and raw_input() != 'exit':
         continue
     localShutdown.value = True
