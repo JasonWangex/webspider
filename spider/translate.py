@@ -16,7 +16,7 @@ class QueueManager(BaseManager):
     pass
 
 
-def start_clean():
+def start_clean(port):
     localShutdown = Value('i', False)
 
     redis_client = redis.StrictRedis(host='1daf5146eb844741.m.cnsha.kvstore.aliyuncs.com', port=6379,
@@ -69,7 +69,7 @@ def start_trash_queue_manager(port, localShutdown):
     Process(target=fill_user_queue_process,
             args=(user_waiting_resolve_url_queue, localShutdown,)).start()
 
-    local_shutdown_listener(localShutdown)
+    local_shutdown_listener(uid_queue, uid_with_trash_queue, redis_client, localShutdown)
 
 
 def translate_trash_uid(uid_with_trash_queue, redis_client, localShutdown):
@@ -85,9 +85,9 @@ def translate_uid(uid_queue, redis_client, localShutdown,):
     while not localShutdown.value:
         try:
             uid = redis_client.blpop("cleaned_uid", timeout=30)
-            uid_queue.put(uid, timeout=60)
+            uid_queue.put(uid[1], timeout=60)
         except Full:
-            print uid, "is lost"
+            print uid[1], "is lost"
             continue
 
 
@@ -125,7 +125,7 @@ def clean_uid(redis_client, localShutdown):
         uid_with_trash = redis_client.blpop("uid_with_trash", timeout=5)
         if uid_with_trash is None:
             continue
-        if not redis_client.sismember('all_uid_list', uid_with_trash):
-            redis_client.sadd("all_uid_list", uid_with_trash)
-            redis_client.lpush("cleaned_uid", uid_with_trash)
+        if not redis_client.sismember('all_uid_list', uid_with_trash[1]):
+            redis_client.sadd("all_uid_list", uid_with_trash[1])
+            redis_client.lpush("cleaned_uid", uid_with_trash[1])
 

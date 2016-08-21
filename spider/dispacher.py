@@ -175,10 +175,12 @@ def follower_url_process(uid_with_trash_queue, operator, localShutdown):
         user_dao.save_or_update(current_user)
 
 
-def local_shutdown_listener(localShutdown):
+def local_shutdown_listener(uid_queue, uid_with_trash_queue, redis_client, localShutdown):
     while not localShutdown.value and raw_input() != 'exit':
         continue
     localShutdown.value = True
+    for uid in uid_queue:
+        redis_client.lpush("")
 
 
 def start_process(procs):
