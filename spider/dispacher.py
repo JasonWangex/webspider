@@ -132,6 +132,7 @@ def followee_url_process(uid_with_trash_queue, user_waiting_resolve_url_queue, o
         current_user.getFollowees = max_followee_page
         user_dao.save_or_update(current_user)
 
+
 def local_shutdown_listener(localShutdown):
     while not localShutdown.value and raw_input() != 'exit':
         continue
@@ -177,7 +178,7 @@ def start_url_resolver(address, port, localShutdown):
     manager.connect()
 
     UserQueueManager.register('get_user_waiting_resolve_url_queue')
-    user_manager = QueueManager(address=('139.196.32.66', 9901), authkey=config.auth_key)
+    user_manager = UserQueueManager(address=('139.196.32.66', 9901), authkey=config.auth_key)
     user_manager.connect()
 
     download.start_download()
