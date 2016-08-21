@@ -46,7 +46,7 @@ def start_trash_queue_manager(port, localShutdown):
     print '/////// 系统启动 - 转发节点 ///////'
     user_waiting_resolve_url_queue = Queue(20)
     uid_with_trash_queue = Queue(500)
-    uid_queue = Queue(500)
+    uid_queue = Queue(50)
 
     QueueManager.register('get_user_waiting_resolve_url_queue', callable=lambda: user_waiting_resolve_url_queue)
     QueueManager.register('get_uid_with_trash_queue', callable=lambda: uid_with_trash_queue)

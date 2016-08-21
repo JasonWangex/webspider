@@ -132,49 +132,6 @@ def followee_url_process(uid_with_trash_queue, user_waiting_resolve_url_queue, o
         current_user.getFollowees = max_followee_page
         user_dao.save_or_update(current_user)
 
-
-def follower_url_process(uid_with_trash_queue, operator, localShutdown):
-    global failedCount
-    while not localShutdown.value:
-        current_user = user_dao.get_user_for_followers()
-        if current_user is None:
-            continue
-
-        max_follower_page = 0 if current_user.followers == 0 else current_user.followers / 20 + 1
-        while current_user.getFollowers < max_follower_page and not localShutdown.value:
-            if failedCount > 5 and operator:
-                print '///////URL 被封禁///////'
-                time.sleep(1)
-                print '>>>>>> 正在尝试重启...'
-                if not download.restart():
-                    print '/////////重启失败！/////////'
-                    localShutdown.value = True
-                    break
-                else:
-                    failedCount = 0
-                    time.sleep(10)
-
-            msg = download.get_followers(hash_id=current_user.hashId, page=current_user.getFollowers)
-
-            current_user.getFollowers += 1
-            user_dao.save_or_update(current_user)
-
-            print ">>>>> URL下载成功 - Follower ", current_user.getFollowers
-            uids = resolver.resolve_for_uids(msg)
-            for uid in uids:
-                try:
-                    uid_with_trash_queue.put(uid, timeout=10)
-                except Full:
-                    if localShutdown.value:
-                        return
-                    else:
-                        print ">>>>>", uid, "is lost!"
-                        continue
-        current_user.needGetFollowers = False
-        current_user.getFollowers = max_follower_page
-        user_dao.save_or_update(current_user)
-
-
 def local_shutdown_listener(localShutdown):
     while not localShutdown.value and raw_input() != 'exit':
         continue
@@ -207,19 +164,26 @@ def start_download(address, port, localShutdown):
     download.shut_down()
 
 
+def UserQueueManager(BaseManager):
+    pass
+
+
 def start_url_resolver(address, port, localShutdown):
     print '/////// 系统启动 - RUL节点 ///////'
 
     QueueManager.register('get_uid_with_trash_queue')
-    QueueManager.register('get_user_waiting_resolve_url_queue')
 
     manager = QueueManager(address=(address, port), authkey=config.auth_key)
     manager.connect()
 
+    UserQueueManager.register('get_user_waiting_resolve_url_queue')
+    user_manager = QueueManager(address=('139.196.32.66', 9901), authkey=config.auth_key)
+    user_manager.connect()
+
     download.start_download()
 
     uid_with_trash_queue = manager.get_uid_with_trash_queue()
-    user_waiting_resolve_url_queue = manager.get_user_waiting_resolve_url_queue()
+    user_waiting_resolve_url_queue = user_manager.get_user_waiting_resolve_url_queue()
 
     process = [
         Process(target=followee_url_process,
