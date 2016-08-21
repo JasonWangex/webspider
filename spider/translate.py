@@ -5,7 +5,6 @@ from multiprocessing.managers import BaseManager, Value
 from dispacher import local_shutdown_listener
 from Domain import User
 
-import pickle
 import redis
 import time
 import threading
@@ -17,8 +16,7 @@ class QueueManager(BaseManager):
     pass
 
 
-def start_clean(port):
-    all_uid_list = []
+def start_clean():
     localShutdown = Value('i', False)
 
     redis_client = redis.StrictRedis(host='1daf5146eb844741.m.cnsha.kvstore.aliyuncs.com', port=6379,
@@ -31,13 +29,12 @@ def start_clean(port):
     clean_thread.start()
 
     # 数据报告
-    report_thread = threading.Thread(target=report, args=(all_uid_list, redis_client, localShutdown,))
+    report_thread = threading.Thread(target=report, args=(redis_client, localShutdown,))
     report_thread.start()
 
     local_shutdown_listener(localShutdown)
     report_thread.join()
-    # 关闭服务
-    before_shut_down(all_uid_list)
+
     print '>>>>>>> 系统将在  5  秒后关闭<<<<<<<'
     for i in range(4, 0, -1):
         time.sleep(1)
@@ -90,6 +87,7 @@ def translate_uid(uid_queue, redis_client, localShutdown,):
             uid = redis_client.blpop("cleaned_uid", timeout=30)
             uid_queue.put(uid, timeout=60)
         except Full:
+            print uid, "is lost"
             continue
 
 
@@ -106,13 +104,13 @@ def fill_user_queue_process(user_waiting_resolve_url_queue, localShutdown):
             continue
 
 
-def report(all_uid_list, redis_client, shutdown):
+def report(redis_client, localShutdown):
     last_length = 0
-    while not shutdown.get():
+    while not localShutdown.value:
         time.sleep(10)
-        if shutdown.get():
+        if localShutdown.value:
             break
-        current_length = len(all_uid_list)
+        current_length = redis_client.scard('all_uid_list')
         print "\n////////////数据报告////////////"
         print ">>>> 待解析 uid 列表: ", redis_client.llen("cleaned_uid")
         print ">>>> 待清洗 uid 列表: ", redis_client.llen("uid_with_trash")
@@ -131,10 +129,3 @@ def clean_uid(redis_client, localShutdown):
             redis_client.sadd("all_uid_list", uid_with_trash)
             redis_client.lpush("cleaned_uid", uid_with_trash)
 
-
-def before_shut_down(all_uid_list):
-    print '>>>>>> 信息存储中'
-    with open('all_uid_list', 'wb') as f_all_uid:
-        pickle.dump(all_uid_list, file=f_all_uid)
-    print '>>>>>> 总解析uid列表 存储完毕'
-    print '\n/////////系统关闭！/////////'
