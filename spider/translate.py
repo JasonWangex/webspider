@@ -68,7 +68,8 @@ def start_trash_queue_manager(port, localShutdown):
             args=(uid_queue, redis_client, localShutdown,)).start()
     Process(target=fill_user_queue_process,
             args=(user_waiting_resolve_url_queue, localShutdown,)).start()
-
+    Process(target=queue_report,
+            args=(uid_queue, uid_with_trash_queue, localShutdown,)).start()
     while not localShutdown.value and raw_input() != 'exit':
         continue
     localShutdown.value = True
@@ -122,9 +123,19 @@ def report(redis_client, localShutdown):
         print ">>>> 待解析 uid 列表: ", redis_client.llen("cleaned_uid")
         print ">>>> 待清洗 uid 列表: ", redis_client.llen("uid_with_trash")
         print ">>>> 总解析 uid 列表: ", current_length
-        print ">>>> 总解析 uid 速率: ", (current_length - last_length) / 10, "个/秒"
+        print ">>>> 总解析 uid 速率: ", (current_length - last_length) / 10.0, "个/秒"
         print "////////////数据报告////////////\n"
         last_length = current_length
+
+
+def queue_report(uid_queue, localShutdown):
+    while not localShutdown.value:
+        time.sleep(10)
+        if localShutdown.value:
+            break
+        print "\n////////////数据报告////////////"
+        print ">>>> 待解析 uid 列表: ", uid_queue.qsize()
+        print "////////////数据报告////////////\n"
 
 
 def clean_uid(redis_client, localShutdown):
