@@ -74,9 +74,11 @@ def start_trash_queue_manager(port, localShutdown):
         continue
     localShutdown.value = True
     time.sleep(10)
-    for uid in uid_queue:
+    while not uid_queue.empty():
+        uid = uid_queue.get()
         redis_client.lpush('cleaned_uid', uid)
-    for uid in uid_with_trash_queue:
+    while not uid_with_trash_queue.empty():
+        uid = uid_with_trash_queue.get()
         redis_client.lpush('uid_with_trash', uid)
 
 
