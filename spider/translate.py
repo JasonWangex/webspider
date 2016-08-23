@@ -95,7 +95,9 @@ def translate_trash_uid(uid_with_trash_queue, redis_client, localShutdown):
 def translate_uid(uid_queue, redis_client, localShutdown,):
     while not localShutdown.value:
         try:
-            uid = redis_client.blpop("cleaned_uid", timeout=30)
+            uid = redis_client.brpop("cleaned_uid", timeout=30)
+            if uid.find("[u'") != -1:
+                continue
             uid_queue.put(uid[1], timeout=60)
         except Full:
             print uid[1], "is lost"
@@ -143,8 +145,8 @@ def queue_report(uid_queue, localShutdown):
 
 def clean_uid(redis_client, localShutdown):
     while not localShutdown.value:
-        uid_with_trash = redis_client.blpop("uid_with_trash", timeout=5)
-        if uid_with_trash is None:
+        uid_with_trash = redis_client.brpop("uid_with_trash", timeout=5)
+        if uid_with_trash is None or uid_with_trash.find("[u'") != -1:
             continue
         if not redis_client.sismember('all_uid_list', uid_with_trash[1]):
             redis_client.sadd("all_uid_list", uid_with_trash[1])
